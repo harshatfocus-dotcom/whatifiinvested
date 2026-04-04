@@ -22,10 +22,34 @@ Important guidelines:
 
 Keep responses concise, helpful, and focused on the user's portfolio questions.`;
 
+interface PortfolioData {
+  totalInvested?: number;
+  currentValue?: number;
+  absoluteReturn?: number;
+  percentReturn?: number;
+  cagr?: number;
+}
+
+interface AssetData {
+  symbol: string;
+  name: string;
+}
+
+interface StrategyData {
+  strategy?: string;
+  signal?: string;
+  reasoning?: string;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { question, portfolio, assets } = body;
+    const { question, portfolio, assets, strategies } = body as {
+      question: string;
+      portfolio?: PortfolioData;
+      assets?: AssetData[];
+      strategies?: StrategyData[];
+    };
 
     const portfolioContext = `
 Portfolio Details:
@@ -35,7 +59,9 @@ Portfolio Details:
 - Percent Return: ${portfolio?.percentReturn?.toFixed(1) || 0}%
 - CAGR: ${portfolio?.cagr?.toFixed(1) || 0}%
 
-Assets: ${assets?.map((a: any) => `${a.symbol} (${a.name})`).join(", ") || "N/A"}
+Assets: ${assets?.map((a) => `${a.symbol} (${a.name})`).join(", ") || "N/A"}
+
+Strategy Signals: ${strategies?.map((s) => `${s.strategy}: ${s.signal}`).join(", ") || "N/A"}
     `.trim();
 
     const userMessage = `${question}\n\n${portfolioContext}`;
@@ -138,11 +164,9 @@ Assets: ${assets?.map((a: any) => `${a.symbol} (${a.name})`).join(", ") || "N/A"
     }
 
     // Smart fallback responses based on actual portfolio data
-    const totalInvested = portfolio?.totalInvested || 0;
-    const currentValue = portfolio?.currentValue || 0;
     const percentReturn = portfolio?.percentReturn || 0;
     const cagr = portfolio?.cagr || 0;
-    const assetsList = assets?.map((a: any) => a.symbol).join(", ") || "N/A";
+    const assetsList = assets?.map((a: { symbol: string }) => a.symbol).join(", ") || "N/A";
     
     const getFallbackResponse = () => {
       const responses = [];

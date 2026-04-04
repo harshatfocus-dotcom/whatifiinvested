@@ -1,7 +1,7 @@
 export interface Asset {
   symbol: string;
   name: string;
-  type: "stock" | "etf" | "mutual_fund";
+  type: "stock" | "etf" | "mutual_fund" | "commodity" | "index" | "crypto";
   exchange: string;
   currentPrice: number;
   priceChange: number;
@@ -42,6 +42,7 @@ export interface PortfolioAnalysis {
   chartData: ChartDataPoint[];
   bestPerformer: { symbol: string; returnPercent: number };
   worstPerformer: { symbol: string; returnPercent: number };
+  signals?: SignalPoint[];
 }
 
 export interface ChartDataPoint {
@@ -83,4 +84,7 @@ export interface SignalPoint {
   price: number;
   type: "entry" | "exit";
   label: string;
+  strategy?: string;
+  amount?: number;
+  reason?: string;
 }

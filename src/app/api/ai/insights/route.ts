@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getHistoricalPrices } from "@/lib/data/market-data";
+import { computeRiskMetrics } from "@/lib/analytics/risk-metrics";
 
 interface AIInsight {
   type: "insight" | "benchmark" | "risk" | "explanation";
@@ -7,46 +9,101 @@ interface AIInsight {
   icon: string;
 }
 
+interface PortfolioData {
+  totalInvested?: number;
+  currentValue?: number;
+  percentReturn?: number;
+  cagr?: number;
+  bestPerformer?: { symbol: string; returnPercent: number };
+  holdings?: Array<{ symbol: string; returnPercent: number }>;
+}
+
+interface AssetData {
+  symbol: string;
+  name?: string;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { portfolio, assets, startDate } = body;
+    const { portfolio, assets, startDate } = body as {
+      portfolio?: PortfolioData;
+      assets?: AssetData[];
+      startDate?: string;
+    };
+
+    const start = startDate || "2021-01-01";
+    const end = new Date();
+    const startDt = new Date(start);
+    const years = Math.max(0.1, (end.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24 * 365));
+
+    // Fetch historical prices for the primary asset to compute real risk metrics
+    const primarySymbol = assets?.[0]?.symbol;
+    let riskMetrics = { maxDrawdown: 0, volatility: 0, sharpeRatio: 0, totalReturn: 0, cagr: 0 };
+
+    if (primarySymbol) {
+      const prices = await getHistoricalPrices(primarySymbol, start);
+      if (prices.length >= 20) {
+        riskMetrics = computeRiskMetrics(
+          prices,
+          portfolio?.totalInvested ?? 100000,
+          portfolio?.currentValue ?? 100000,
+          years
+        );
+      }
+    }
+
+    const totalInvested = portfolio?.totalInvested ?? 0;
+    const currentValue = portfolio?.currentValue ?? 0;
+    const percentReturn = portfolio?.percentReturn ?? 0;
+    const cagr = portfolio?.cagr ?? riskMetrics.cagr;
+
+    // Nifty 50 average CAGR benchmark (~12% historically)
+    const niftyBenchmarkCAGR = 12;
+    const outperformed = cagr > niftyBenchmarkCAGR;
+    const diff = Math.abs(cagr - niftyBenchmarkCAGR).toFixed(1);
 
     const insights: AIInsight[] = [
       {
         type: "insight",
         title: "Portfolio Growth",
-        content: `Your ₹${portfolio?.totalInvested?.toLocaleString() || 0} investment would now be worth ₹${portfolio?.currentValue?.toLocaleString() || 0}, representing a ${portfolio?.percentReturn?.toFixed(1) || 0}% return over the investment period.`,
+        content: `Your ₹${totalInvested.toLocaleString()} investment is now worth ₹${currentValue.toLocaleString()}, a ${percentReturn.toFixed(1)}% return. CAGR of ${cagr.toFixed(1)}% shows ${cagr > 15 ? "exceptional" : cagr > 10 ? "solid" : "moderate"} compounding.`,
         icon: "📈",
       },
       {
         type: "benchmark",
         title: "vs Nifty 50",
-        content: `Compared to Nifty 50 benchmark, your portfolio ${portfolio?.percentReturn > 12 ? "outperformed" : "underperformed"} the market by approximately ${Math.abs(portfolio?.percentReturn - 12).toFixed(1)}%. The index returned ~12% CAGR over the same period.`,
+        content: `Your portfolio ${outperformed ? "outperformed" : "underperformed"} the Nifty 50 by ${diff}% CAGR. The index returned ~${niftyBenchmarkCAGR}% CAGR over the same period. ${outperformed ? "Great stock selection!" : "Consider adding index funds for stability."}`,
         icon: "🎯",
       },
       {
         type: "risk",
         title: "Risk Analysis",
-        content: `Maximum drawdown from peak was approximately ${(15 + Math.random() * 10).toFixed(1)}%. Your portfolio shows ${portfolio?.percentReturn > 15 ? "good" : "moderate"} risk-adjusted returns with a Sharpe ratio around ${(1 + Math.random()).toFixed(2)}.`,
+        content: `Max drawdown: ${riskMetrics.maxDrawdown.toFixed(1)}%. Annual volatility: ${riskMetrics.volatility.toFixed(1)}%. Sharpe ratio: ${riskMetrics.sharpeRatio.toFixed(2)} (${riskMetrics.sharpeRatio > 1 ? "excellent" : riskMetrics.sharpeRatio > 0.5 ? "good" : "needs improvement"} risk-adjusted returns).`,
         icon: "⚠️",
       },
       {
         type: "explanation",
         title: "Strategy Insight",
-        content: `Using Dollar Cost Averaging, you bought more units when prices were low and fewer when high, effectively reducing your average cost per unit. This smoothing effect helped navigate market volatility.`,
+        content: percentReturn > 0
+          ? `Your portfolio grew by ${percentReturn.toFixed(1)}%. Dollar cost averaging reduced your average purchase price during dips, helping you accumulate more units when markets were lower.`
+          : `Markets have been challenging. During corrections, DCA actually works in your favor — you buy more units at lower prices, positioning for recovery.`,
         icon: "💡",
       },
       {
         type: "insight",
         title: "Best Performer",
-        content: `${assets?.[0]?.symbol?.replace(".NS", "") || "N/A"} was your top performer at ${portfolio?.bestPerformer?.returnPercent?.toFixed(1) || 0}% return, contributing significantly to overall portfolio gains.`,
+        content: portfolio?.bestPerformer
+          ? `${portfolio.bestPerformer.symbol.replace(".NS", "")} was your top performer with +${portfolio.bestPerformer.returnPercent.toFixed(1)}% return, demonstrating the power of concentrated quality positions.`
+          : `Your selected assets show diversification across market sectors.`,
         icon: "🏆",
       },
       {
         type: "risk",
         title: "Diversification Score",
-        content: `Your portfolio has ${assets?.length > 3 ? "good" : "limited"} diversification with ${assets?.length || 0} assets. For better risk management, consider adding 2-3 more uncorrelated assets.`,
+        content: (assets?.length ?? 0) >= 5
+          ? `With ${assets?.length} assets, you have ${(assets?.length ?? 0) >= 8 ? "excellent" : "good"} diversification. Your portfolio spans multiple sectors, reducing single-stock risk.`
+          : `With ${assets?.length ?? 0} assets, diversification is limited. Adding 3-4 uncorrelated assets (e.g., Gold ETF, IT sector, FMCG) can reduce volatility by 20-30%.`,
         icon: "🛡️",
       },
     ];

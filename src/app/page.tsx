@@ -2,12 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, PieChart, Lightbulb, Newspaper, ArrowRight, Sparkles, TrendingUp, TrendingDown, AlertTriangle, BarChart3, RefreshCw, Bot, Bitcoin, Gem, Wallet } from "lucide-react";
+import { Search, X, PieChart, Lightbulb, Newspaper, Sparkles, BarChart3, RefreshCw, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PerformanceChart } from "@/components/charts/performance-chart";
-import type { Asset, PortfolioAnalysis, Strategy, NewsItem } from "@/types";
+import type { Asset, PortfolioAnalysis, NewsItem } from "@/types";
 
 interface AssetItem {
   symbol: string;
@@ -60,13 +60,13 @@ export default function Home() {
   const [isRecurring, setIsRecurring] = useState(true);
   const [recurringAmount, setRecurringAmount] = useState(10000);
   const [frequency, setFrequency] = useState("monthly");
-  const [startDate, setStartDate] = useState("2021-01-01");
+  const [startDate, setStartDate] = useState("2021-01");
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [analysis, setAnalysis] = useState<PortfolioAnalysis | null>(null);
   const [strategyResults, setStrategyResults] = useState<StrategyResult[]>([]);
+  const [chartSignals, setChartSignals] = useState<import("@/types").SignalPoint[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("stocks");
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [userQuestion, setUserQuestion] = useState("");
@@ -130,7 +130,7 @@ export default function Home() {
     const assetToAdd: Asset = {
       symbol: asset.symbol,
       name: asset.name,
-      type: asset.assetType as any,
+      type: asset.assetType as Asset["type"],
       exchange: asset.assetType === "crypto" ? "CRYPTO" : asset.assetType === "commodity" ? "MCX" : "NSE",
       currentPrice: asset.currentPrice || 100,
       priceChange: asset.priceChange || 0,
@@ -158,8 +158,9 @@ export default function Home() {
   };
 
   const runSimulation = async () => {
-    console.log("Running simulation...", { selectedAssets, weights, initialInvestment, isRecurring, recurringAmount, frequency, startDate });
     setIsLoading(true);
+    // Convert "YYYY-MM" month input to "YYYY-MM-01" full date
+    const fullStartDate = startDate.length === 7 ? `${startDate}-01` : startDate;
     try {
       const requestBody = {
         assets: selectedAssets.map((a) => ({
@@ -169,48 +170,63 @@ export default function Home() {
           initialInvestment: (initialInvestment * (weights[a.symbol] || 0)) / 100,
           recurringAmount: isRecurring ? recurringAmount : 0,
           frequency: isRecurring ? frequency : null,
-          startDate,
+          startDate: fullStartDate,
         })),
         initialInvestment,
         recurringAmount: isRecurring ? recurringAmount : 0,
         frequency: isRecurring ? frequency : null,
-        startDate,
+        startDate: fullStartDate,
       };
-      console.log("Request body:", JSON.stringify(requestBody, null, 2));
-      
-      const response = await fetch("/api/portfolio/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
 
-      console.log("Response status:", response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", errorText);
+      // Run portfolio analysis + strategies + news in parallel
+      const [portfolioRes, strategiesRes, newsRes] = await Promise.all([
+        fetch("/api/portfolio/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }),
+        fetch("/api/strategies/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assets: selectedAssets,
+            strategies: activeStrategies,
+            startDate: fullStartDate,
+          }),
+        }),
+        fetch(`/api/news?symbols=${selectedAssets.map(a => a.symbol).join(",")}&days=365`),
+      ]);
+
+      if (!portfolioRes.ok) {
+        const errorText = await portfolioRes.text();
+        console.error("Portfolio API Error:", errorText);
         setIsLoading(false);
         return;
       }
 
-      const data = await response.json();
-      console.log("Analysis data:", data);
-      setAnalysis(data);
+      const portfolioData = await portfolioRes.json();
+      setAnalysis(portfolioData);
+      generateAIInsights(portfolioData);
 
-      const strategiesRes = await fetch("/api/strategies/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assets: selectedAssets,
-          strategies: activeStrategies,
-        }),
-      });
       if (strategiesRes.ok) {
         const strategyData = await strategiesRes.json();
         setStrategyResults(strategyData);
+        // Collect all entry/exit signals from strategy backtests for the chart
+        const allSignals: import("@/types").SignalPoint[] = [];
+        for (const result of strategyData) {
+          if (result.signals) allSignals.push(...result.signals);
+        }
+        // Deduplicate by date+type
+        const seen = new Set<string>();
+        const uniqueSignals = allSignals.filter((s) => {
+          const key = `${s.date}:${s.type}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setChartSignals(uniqueSignals);
       }
 
-      const symbols = selectedAssets.map(a => a.symbol).join(",");
-      const newsRes = await fetch(`/api/news?symbols=${symbols}&days=365`);
       if (newsRes.ok) {
         const newsData = await newsRes.json();
         setNews(newsData);
@@ -224,7 +240,7 @@ export default function Home() {
     }
   };
 
-  const generateAIInsights = async (data: any) => {
+  const generateAIInsights = async (data: PortfolioAnalysis) => {
     setAiLoading(true);
     
     // Timeout after 10 seconds
@@ -275,6 +291,7 @@ export default function Home() {
           question: userQuestion,
           portfolio: analysis,
           assets: selectedAssets,
+          strategies: strategyResults,
         }),
         signal: controller.signal,
       });
@@ -287,7 +304,7 @@ export default function Home() {
       } else {
         setAiResponse("I apologize, but I couldn't process your question at the moment. Please try again.");
       }
-    } catch (error) {
+    } catch {
       clearTimeout(timeoutId);
       setAiResponse("I apologize, but I couldn't process your question at the moment. Please try again.");
     } finally {
@@ -304,6 +321,9 @@ export default function Home() {
     });
     setWeights(newWeights);
   };
+
+  const weightTotal = Object.values(weights).reduce((a, b) => a + b, 0);
+  const weightsValid = Math.abs(weightTotal - 100) <= 2;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -597,13 +617,24 @@ export default function Home() {
                   </CardContent>
                 </Card>
 
-                <div className="lg:col-span-2 flex gap-4">
-                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-                    ← Back
-                  </Button>
-                  <Button onClick={runSimulation} disabled={isLoading} className="flex-1 gap-2 text-lg py-6">
-                    {isLoading ? "Running Simulation..." : "Run Simulation →"}
-                  </Button>
+                <div className="lg:col-span-2">
+                  {!weightsValid && weightTotal > 0 && (
+                    <div className="mb-3 px-4 py-2 bg-accent-secondary/10 border border-accent-secondary/40 rounded-xl text-sm text-accent-secondary">
+                      ⚠️ Weights sum to {weightTotal}% — must equal 100%. Click &quot;Normalize to 100%&quot; to fix.
+                    </div>
+                  )}
+                  <div className="flex gap-4">
+                    <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                      ← Back
+                    </Button>
+                    <Button
+                      onClick={runSimulation}
+                      disabled={isLoading || (!weightsValid && selectedAssets.length > 0)}
+                      className="flex-1 gap-2 text-lg py-6"
+                    >
+                      {isLoading ? "Running Simulation..." : "Run Simulation →"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -663,9 +694,10 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   {analysis.chartData && analysis.chartData.length > 0 && (
-                    <PerformanceChart 
-                      data={analysis.chartData} 
-                      symbol={selectedAssets.map(a => a.symbol.replace(".NS", "")).join(", ")} 
+                    <PerformanceChart
+                      data={analysis.chartData}
+                      symbol={selectedAssets.map(a => a.symbol.replace(".NS", "")).join(", ")}
+                      signals={chartSignals}
                     />
                   )}
                 </CardContent>

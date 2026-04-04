@@ -1,117 +1,71 @@
 import { NextResponse } from "next/server";
-
-interface StrategyResult {
-  strategy: string;
-  icon: string;
-  signal: "BUY" | "SELL" | "HOLD";
-  entryPrice: number;
-  exitPrice: number;
-  reasoning: string;
-  probability: number;
-  graph?: { label: string; value: number }[];
-}
-
-const CURRENT_PRICES: Record<string, number> = {
-  "RELIANCE.NS": 2950, "TCS.NS": 4200, "HDFCBANK.NS": 1680, "INFY.NS": 1900,
-  "ICICIBANK.NS": 1200, "SBIN.NS": 820, "HINDUNILVR.NS": 2850, "ITC.NS": 450,
-  "KOTAKBANK.NS": 1850, "BHARTIARTL.NS": 1580, "NIFTYBEES.NS": 250, "GOLDBEES.NS": 58,
-  "SILVERBEES.NS": 125, "MON100.NS": 850, "MID100BEES.NS": 320, "MF001": 850, "MF002": 72,
-};
-
-const STRATEGY_CONFIGS: Record<string, { icon: string; buyReason: string; sellReason: string; holdReason: string }> = {
-  sma_crossover: {
-    icon: "📈",
-    buyReason: "50-day MA crossed above 200-day MA - strong bullish signal. Historically preceded 15-25% gains.",
-    sellReason: "50-day MA crossed below 200-day MA - bearish trend. Typically led to 10-20% declines.",
-    holdReason: "Moving averages converging - unclear trend direction.",
-  },
-  rsi: {
-    icon: "📊",
-    buyReason: "RSI below 30 indicates oversold conditions - potential bottom and buying opportunity.",
-    sellReason: "RSI above 70 indicates overbought conditions - stock may correct soon.",
-    holdReason: "RSI in neutral zone (30-70) - no clear overbought/oversold signal.",
-  },
-  macd: {
-    icon: "⚡",
-    buyReason: "MACD line crossed above signal - bullish momentum building.",
-    sellReason: "MACD line crossed below signal - bearish momentum increasing.",
-    holdReason: "MACD near zero - sideways momentum, no clear direction.",
-  },
-  bollinger: {
-    icon: "🎯",
-    buyReason: "Price near lower Bollinger Band - potential bounce opportunity.",
-    sellReason: "Price near upper Bollinger Band - expect resistance.",
-    holdReason: "Price in middle of bands - normal volatility range.",
-  },
-  value: {
-    icon: "💎",
-    buyReason: "P/E ratio below 15 - undervalued stock, strong buy for value investors.",
-    sellReason: "P/E ratio above 25 - potentially overvalued, consider taking profits.",
-    holdReason: "P/E ratio between 15-25 - fair value, maintain position.",
-  },
-  momentum: {
-    icon: "🚀",
-    buyReason: "Price above 20-day MA by 5%+ - strong positive momentum.",
-    sellReason: "Price below 20-day MA by 5%+ - negative momentum signal.",
-    holdReason: "Price within 5% of 20-day MA - neutral momentum.",
-  },
-  dca: {
-    icon: "💰",
-    buyReason: "Consistent DCA strategy averages out volatility - continue investing.",
-    sellReason: "Consider taking profit if portfolio has grown significantly.",
-    holdReason: "DCA continues - market timing not recommended.",
-  },
-  vwap: {
-    icon: "📉",
-    buyReason: "Price trading below VWAP - buying at better average price.",
-    sellReason: "Price trading above VWAP - consider taking profits.",
-    holdReason: "Price at VWAP - fair market value.",
-  },
-  moving_ribbon: {
-    icon: "🎗️",
-    buyReason: "Moving averages in bullish alignment (short > medium > long).",
-    sellReason: "Moving averages in bearish alignment (short < medium < long).",
-    holdReason: "Moving averages overlapping - consolidating.",
-  },
-  rsr: {
-    icon: "🏆",
-    buyReason: "Strong relative strength vs peers - continue holding.",
-    sellReason: "Weak relative strength - consider rotation.",
-    holdReason: "Neutral relative strength - maintain current allocation.",
-  },
-};
+import { getHistoricalPrices } from "@/lib/data/market-data";
+import { runBacktest } from "@/lib/strategies/backtester";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { assets, strategies } = body as { assets: any[]; strategies: string[] };
+    const { assets, strategies, startDate } = body as {
+      assets: Array<{ symbol: string; name: string }>;
+      strategies: string[];
+      startDate?: string;
+    };
 
-    const results: StrategyResult[] = [];
+    const start = startDate || "2020-01-01";
+    const results = [];
 
+    // Fetch historical data for each unique asset
+    const uniqueSymbols = [...new Set((assets || []).map((a) => a.symbol))];
+    const histMap = new Map<string, Awaited<ReturnType<typeof getHistoricalPrices>>>();
+
+    await Promise.all(
+      uniqueSymbols.map(async (symbol) => {
+        const prices = await getHistoricalPrices(symbol, start);
+        histMap.set(symbol, prices);
+      })
+    );
+
+    const strategyList = strategies?.length ? strategies : ["sma_crossover", "rsi", "macd"];
+
+    // Run backtests for each asset × strategy combination (deduplicated by strategy)
+    const seen = new Set<string>();
     for (const asset of assets || []) {
-      const currentPrice = CURRENT_PRICES[asset.symbol] || 100;
-      
-      for (const strategyId of strategies || ["sma_crossover", "rsi", "macd"]) {
-        const config = STRATEGY_CONFIGS[strategyId];
-        if (!config) continue;
-        
-        const randomSignal = Math.random();
-        const signal = randomSignal > 0.55 ? "BUY" : randomSignal > 0.25 ? "SELL" : "HOLD";
-        
-        const graphData = Array.from({ length: 12 }, (_, i) => ({
-          label: `M${i + 1}`,
-          value: Math.round(30 + Math.random() * 70),
-        }));
+      const prices = histMap.get(asset.symbol) || [];
+
+      for (const strategyId of strategyList) {
+        const key = `${strategyId}:${asset.symbol}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const backtest = runBacktest(strategyId, prices);
+        if (!backtest) continue;
+
+        // Find the most recent BUY signal for entry price, most recent SELL for exit
+        const buySignals = backtest.signals.filter((s) => s.type === "BUY");
+        const sellSignals = backtest.signals.filter((s) => s.type === "SELL");
+        const lastBuy = buySignals[buySignals.length - 1];
+        const lastSell = sellSignals[sellSignals.length - 1];
 
         results.push({
-          strategy: strategyId.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-          icon: config.icon,
-          signal,
-          entryPrice: Math.round(currentPrice * (signal === "BUY" ? 0.92 : signal === "SELL" ? 1.05 : 0.98)),
-          exitPrice: Math.round(currentPrice * (signal === "SELL" ? 0.88 : 1.18)),
-          reasoning: signal === "BUY" ? config.buyReason : signal === "SELL" ? config.sellReason : config.holdReason,
-          probability: Math.round(65 + Math.random() * 25),
-          graph: graphData,
+          strategy: backtest.strategyName,
+          icon: backtest.icon,
+          signal: backtest.latestSignal,
+          entryPrice: lastBuy?.price ?? backtest.latestPrice * 0.95,
+          exitPrice: lastSell?.price ?? backtest.latestPrice * 1.12,
+          reasoning: backtest.reasoning,
+          probability: backtest.confidence,
+          graph: backtest.indicatorSeries.length > 0
+            ? backtest.indicatorSeries
+            : generateFallbackGraph(backtest.latestSignal),
+          signals: backtest.signals.slice(-20).map((s) => ({
+            date: s.date,
+            price: s.price,
+            type: s.type === "BUY" ? "entry" : "exit",
+            label: `${s.type}: ${backtest.strategyName}`,
+            strategy: backtest.strategyName,
+            amount: s.price,
+            reason: s.reason,
+          })),
         });
       }
     }
@@ -121,4 +75,12 @@ export async function POST(request: Request) {
     console.error("Strategy analysis error:", error);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }
+}
+
+function generateFallbackGraph(signal: string): { label: string; value: number }[] {
+  const base = signal === "BUY" ? 65 : signal === "SELL" ? 35 : 50;
+  return Array.from({ length: 12 }, (_, i) => ({
+    label: `M${i + 1}`,
+    value: Math.max(10, Math.min(90, base + (i - 6) * 2)),
+  }));
 }

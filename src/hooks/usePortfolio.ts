@@ -53,7 +53,7 @@ export function usePortfolio() {
         startDate,
       },
     ]);
-  }, [selectedAssets.length, initialInvestment, recurringInvestment, isRecurring, frequency, startDate]);
+  }, [selectedAssets, initialInvestment, recurringInvestment, isRecurring, frequency, startDate]);
 
   const removeAsset = useCallback((symbol: string) => {
     setSelectedAssets((prev) => prev.filter((a) => a.symbol !== symbol));

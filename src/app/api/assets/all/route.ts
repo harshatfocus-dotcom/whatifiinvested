@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const NIFTY_50_STOCKS = [
+const NIFTY_50_STOCKS = [
   { symbol: "RELIANCE.NS", name: "Reliance Industries Ltd", sector: "Conglomerate" },
   { symbol: "TCS.NS", name: "Tata Consultancy Services Ltd", sector: "IT" },
   { symbol: "HDFCBANK.NS", name: "HDFC Bank Ltd", sector: "Banking" },
@@ -52,7 +52,7 @@ export const NIFTY_50_STOCKS = [
   { symbol: "JIOFIN.NS", name: "Jio Financial Services Ltd", sector: "Finance" },
 ];
 
-export const ETFS = [
+const ETFS = [
   { symbol: "NIFTYBEES.NS", name: "Nifty 50 ETF", category: "Index" },
   { symbol: "GOLDBEES.NS", name: "Gold ETF", category: "Gold" },
   { symbol: "SILVERBEES.NS", name: "Silver ETF", category: "Silver" },
@@ -77,7 +77,7 @@ export const ETFS = [
   { symbol: "SETFGOLD.NS", name: "Gold ETF", category: "Gold" },
 ];
 
-export const MUTUAL_FUNDS = [
+const MUTUAL_FUNDS = [
   { symbol: "MF001", name: "HDFC Top 100 Fund - Growth", category: "Large Cap" },
   { symbol: "MF002", name: "SBI Bluechip Fund - Growth", category: "Large Cap" },
   { symbol: "MF003", name: "ICICI Prudential Bluechip Fund - Growth", category: "Large Cap" },
@@ -130,7 +130,7 @@ export const MUTUAL_FUNDS = [
   { symbol: "MF050", name: "Nutritional Small Cap Fund - Growth", category: "Small Cap" },
 ];
 
-export const COMMODITIES = [
+const COMMODITIES = [
   { symbol: "GC=F", name: "Gold Futures", category: "Precious Metals" },
   { symbol: "SI=F", name: "Silver Futures", category: "Precious Metals" },
   { symbol: "PL=F", name: "Platinum Futures", category: "Precious Metals" },
@@ -151,7 +151,7 @@ export const COMMODITIES = [
   { symbol: "Rubber Futures", name: "Rubber Futures", category: "Agriculture" },
 ];
 
-export const INDEXES = [
+const INDEXES = [
   { symbol: "^NSEI", name: "Nifty 50", category: "Index" },
   { symbol: "^BSESN", name: "Sensex", category: "Index" },
   { symbol: "NIFTYMIDCAP.NS", name: "Nifty Midcap 50", category: "Index" },
@@ -174,7 +174,7 @@ export const INDEXES = [
   { symbol: "NIFTY100.NS", name: "Nifty 100", category: "Index" },
 ];
 
-export const CRYPTO = [
+const CRYPTO = [
   { symbol: "BTC-USD", name: "Bitcoin", category: "Cryptocurrency" },
   { symbol: "ETH-USD", name: "Ethereum", category: "Cryptocurrency" },
   { symbol: "BNB-USD", name: "Binance Coin", category: "Cryptocurrency" },
