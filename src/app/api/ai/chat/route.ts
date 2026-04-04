@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 
 const SYSTEM_PROMPT = `You are a knowledgeable financial advisor for an investment backtesting platform called "WhatIfIInvested". 
 
@@ -98,6 +99,41 @@ Assets: ${assets?.map((a: any) => `${a.symbol} (${a.name})`).join(", ") || "N/A"
         }
       } catch (openRouterError) {
         console.error("OpenRouter API error:", openRouterError);
+      }
+    }
+
+    // Try Sarvam AI
+    if (SARVAM_API_KEY && SARVAM_API_KEY !== "your_sarvam_api_key") {
+      try {
+        const sarvamResponse = await fetch(
+          "https://api.sarvam.ai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SARVAM_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "sarvam-m",
+              messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: userMessage },
+              ],
+              temperature: 0.7,
+              max_tokens: 500,
+            }),
+          }
+        );
+
+        if (sarvamResponse.ok) {
+          const data = await sarvamResponse.json();
+          const response = data.choices?.[0]?.message?.content;
+          if (response) {
+            return NextResponse.json({ response });
+          }
+        }
+      } catch (sarvamError) {
+        console.error("Sarvam AI API error:", sarvamError);
       }
     }
 

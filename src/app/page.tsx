@@ -209,7 +209,8 @@ export default function Home() {
         setStrategyResults(strategyData);
       }
 
-      const newsRes = await fetch(`/api/news?symbol=${selectedAssets[0].symbol}&days=30`);
+      const symbols = selectedAssets.map(a => a.symbol).join(",");
+      const newsRes = await fetch(`/api/news?symbols=${symbols}&days=365`);
       if (newsRes.ok) {
         const newsData = await newsRes.json();
         setNews(newsData);
@@ -225,6 +226,12 @@ export default function Home() {
 
   const generateAIInsights = async (data: any) => {
     setAiLoading(true);
+    
+    // Timeout after 10 seconds
+    const timeoutId = setTimeout(() => {
+      setAiLoading(false);
+    }, 10000);
+    
     try {
       const response = await fetch("/api/ai/insights", {
         method: "POST",
@@ -236,6 +243,8 @@ export default function Home() {
         }),
       });
 
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const insights = await response.json();
         setAiInsights(insights);
@@ -250,7 +259,15 @@ export default function Home() {
   const askAI = async () => {
     if (!userQuestion.trim()) return;
     setAiLoading(true);
+    
+    // Timeout after 10 seconds
+    const timeoutId = setTimeout(() => {
+      setAiResponse("I apologize, but I couldn't process your question at the moment. Please try again.");
+      setAiLoading(false);
+    }, 10000);
+    
     try {
+      const controller = new AbortController();
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -259,14 +276,20 @@ export default function Home() {
           portfolio: analysis,
           assets: selectedAssets,
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const data = await response.json();
         setAiResponse(data.response);
+      } else {
+        setAiResponse("I apologize, but I couldn't process your question at the moment. Please try again.");
       }
     } catch (error) {
-      setAiResponse("Sorry, I couldn't process your question. Please try again.");
+      clearTimeout(timeoutId);
+      setAiResponse("I apologize, but I couldn't process your question at the moment. Please try again.");
     } finally {
       setAiLoading(false);
     }
