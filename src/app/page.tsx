@@ -158,53 +158,64 @@ export default function Home() {
   };
 
   const runSimulation = async () => {
+    console.log("Running simulation...", { selectedAssets, weights, initialInvestment, isRecurring, recurringAmount, frequency, startDate });
     setIsLoading(true);
     try {
-      const response = await fetch("/api/portfolio/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assets: selectedAssets.map((a) => ({
-            symbol: a.symbol,
-            name: a.name,
-            weight: weights[a.symbol] || Math.floor(100 / selectedAssets.length),
-            initialInvestment: initialInvestment * (weights[a.symbol] || 0) / 100,
-            recurringAmount: isRecurring ? recurringAmount : 0,
-            frequency: isRecurring ? frequency : null,
-            startDate,
-          })),
-          initialInvestment,
+      const requestBody = {
+        assets: selectedAssets.map((a) => ({
+          symbol: a.symbol,
+          name: a.name,
+          weight: weights[a.symbol] || Math.floor(100 / selectedAssets.length),
+          initialInvestment: (initialInvestment * (weights[a.symbol] || 0)) / 100,
           recurringAmount: isRecurring ? recurringAmount : 0,
           frequency: isRecurring ? frequency : null,
           startDate,
-        }),
+        })),
+        initialInvestment,
+        recurringAmount: isRecurring ? recurringAmount : 0,
+        frequency: isRecurring ? frequency : null,
+        startDate,
+      };
+      console.log("Request body:", JSON.stringify(requestBody, null, 2));
+      
+      const response = await fetch("/api/portfolio/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setAnalysis(data);
-
-        const strategiesRes = await fetch("/api/strategies/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            assets: selectedAssets,
-            strategies: activeStrategies,
-          }),
-        });
-        if (strategiesRes.ok) {
-          const strategyData = await strategiesRes.json();
-          setStrategyResults(strategyData);
-        }
-
-        const newsRes = await fetch(`/api/news?symbol=${selectedAssets[0].symbol}&days=30`);
-        if (newsRes.ok) {
-          const newsData = await newsRes.json();
-          setNews(newsData);
-        }
-
-        generateAIInsights(data);
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        setIsLoading(false);
+        return;
       }
+
+      const data = await response.json();
+      console.log("Analysis data:", data);
+      setAnalysis(data);
+
+      const strategiesRes = await fetch("/api/strategies/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assets: selectedAssets,
+          strategies: activeStrategies,
+        }),
+      });
+      if (strategiesRes.ok) {
+        const strategyData = await strategiesRes.json();
+        setStrategyResults(strategyData);
+      }
+
+      const newsRes = await fetch(`/api/news?symbol=${selectedAssets[0].symbol}&days=30`);
+      if (newsRes.ok) {
+        const newsData = await newsRes.json();
+        setNews(newsData);
+      }
+
+      setStep(3);
     } catch (error) {
       console.error("Simulation failed:", error);
     } finally {
