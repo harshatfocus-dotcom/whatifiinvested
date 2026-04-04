@@ -17,11 +17,11 @@ const SYMBOL_TO_COMPANY: Record<string, string> = {
   "INFY.NS": "Infosys",
   "ICICIBANK.NS": "ICICI Bank",
   "SBIN.NS": "SBI State Bank India",
-  "HINDUNILVR.NS": "Hindustan Unilever HUL",
+  "HINDUNILVR.NS": "Hindustan Unilever",
   "ITC.NS": "ITC Limited",
   "KOTAKBANK.NS": "Kotak Mahindra Bank",
   "BHARTIARTL.NS": "Bharti Airtel",
-  "NIFTYBEES.NS": "Nifty 50 Sensex",
+  "NIFTYBEES.NS": "Nifty 50 stock market",
   "GOLDBEES.NS": "Gold ETF India",
   "TATAMOTORS.NS": "Tata Motors",
   "MARUTI.NS": "Maruti Suzuki",
@@ -34,241 +34,229 @@ const SYMBOL_TO_COMPANY: Record<string, string> = {
   "SUNPHARMA.NS": "Sun Pharma",
   "TITAN.NS": "Titan Company",
   "ASIANPAINT.NS": "Asian Paints",
-  "BTC-USD": "Bitcoin cryptocurrency",
-  "ETH-USD": "Ethereum cryptocurrency",
-  "GC=F": "Gold commodity price",
+  "BTC-USD": "Bitcoin",
+  "ETH-USD": "Ethereum",
+  "GC=F": "Gold price",
   "CL=F": "Crude oil price",
 };
 
 function inferSentiment(text: string): "positive" | "negative" | "neutral" {
   const t = text.toLowerCase();
-  const pos = ["rise", "surge", "gain", "profit", "growth", "beat", "jump", "record", "rally", "strong", "upgrade", "outperform"].filter(w => t.includes(w)).length;
-  const neg = ["fall", "drop", "loss", "decline", "miss", "slump", "cut", "downgrade", "weak", "concern", "crash", "risk"].filter(w => t.includes(w)).length;
+  const pos = ["rise","surge","gain","profit","growth","beat","jump","record","rally","strong","upgrade","outperform"].filter(w => t.includes(w)).length;
+  const neg = ["fall","drop","loss","decline","miss","slump","cut","downgrade","weak","concern","crash","risk"].filter(w => t.includes(w)).length;
   return pos > neg ? "positive" : neg > pos ? "negative" : "neutral";
+}
+
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
 async function fetchFromNewsDataIO(company: string): Promise<NewsItem[]> {
   const apiKey = process.env.NEWSDATA_API_KEY;
   if (!apiKey) return [];
 
-  const cacheKey = `news:nd:${company}`;
+  const cacheKey = `news:nd2:${company}`;
   const cached = cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    const url = new URL("https://newsdata.io/api/1/latest");
-    url.searchParams.set("apikey", apiKey);
-    url.searchParams.set("q", company);
-    url.searchParams.set("country", "in");
-    url.searchParams.set("language", "en");
-
-    const res = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "WhatIfIInvested/1.0 (investment backtesting app)",
-        "Accept": "application/json",
-      },
-      signal: AbortSignal.timeout(8000),
+    const params = new URLSearchParams({
+      apikey: apiKey,
+      q: company,
+      country: "in",
+      language: "en",
     });
+    const res = await fetchWithTimeout(
+      `https://newsdata.io/api/1/latest?${params}`,
+      { headers: { "User-Agent": "Mozilla/5.0 WhatIfIInvested/1.0" } },
+      8000
+    );
 
+    if (!res.ok) return [];
     const json = await res.json();
-
-    // newsdata.io returns {status: "error", results: {message:...}} on failure
     if (json.status !== "success" || !Array.isArray(json.results)) return [];
 
     const items: NewsItem[] = json.results.slice(0, 5).map((item: {
-      title?: string;
-      source_name?: string;
-      source_id?: string;
-      pubDate?: string;
-      description?: string;
-      ai_summary?: string;
-      link?: string;
-      sentiment?: string;
+      title?: string; source_name?: string; source_id?: string;
+      pubDate?: string; description?: string; ai_summary?: string;
+      link?: string; sentiment?: string;
     }) => {
       const title = item.title || "Market Update";
-      const description = item.ai_summary || item.description || title;
+      const desc = item.ai_summary || item.description || title;
       return {
         title,
         source: item.source_name || item.source_id || "NewsData",
         date: item.pubDate ? item.pubDate.split(" ")[0] : new Date().toISOString().split("T")[0],
-        description,
+        description: desc,
         url: item.link || "#",
         sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
           ? item.sentiment as "positive" | "negative" | "neutral"
-          : inferSentiment(title + " " + description)),
+          : inferSentiment(title + " " + desc)),
       };
     });
 
     if (items.length > 0) cacheSet(cacheKey, items, CACHE_TTL.NEWS);
     return items;
-  } catch {
+  } catch (e) {
+    console.error("NewsData fetch error:", e);
     return [];
   }
 }
 
 async function generateAINews(companies: string[]): Promise<NewsItem[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const cacheKey = `news:ai:${companies.slice(0, 3).join(",")}`;
+  const cacheKey = `news:ai2:${companies.slice(0, 3).join(",")}`;
   const cached = cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
 
   const today = new Date().toISOString().split("T")[0];
   const companiesList = companies.slice(0, 5).join(", ");
 
-  const prompt = `Generate 6 realistic and educational market news headlines and summaries for these Indian stocks/assets: ${companiesList}.
+  const prompt = `You are a financial news writer. Generate 6 realistic, educational market news items for these Indian stocks/assets: ${companiesList}.
 
-Return ONLY a JSON array with this exact structure (no markdown, no extra text):
-[
-  {
-    "title": "headline here",
-    "source": "source name (e.g. Economic Times, Moneycontrol, Business Standard)",
-    "description": "2-3 sentence description with specific details like percentages, numbers",
-    "sentiment": "positive" or "negative" or "neutral"
-  }
-]
+Return ONLY a valid JSON array, no markdown fences, no extra text:
+[{"title":"headline","source":"Economic Times","description":"2-3 sentence detail with numbers","sentiment":"positive"},...]
 
-Make the news realistic, educational, and relevant to Indian markets. Include mix of company-specific and macro news (RBI, FII, GDP, sector trends). Vary sentiments.`;
+Mix company-specific and macro Indian market news (RBI policy, FII flows, GDP, sector trends). Vary sentiments. Be specific with percentages and figures.`;
 
-  // Try Gemini
-  if (apiKey) {
+  // Try Gemini first
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      const res = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1000 },
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
           }),
-          signal: AbortSignal.timeout(10000),
-        }
+        },
+        12000
       );
       if (res.ok) {
         const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (Array.isArray(parsed)) {
-            const items: NewsItem[] = parsed.map((item: {
-              title?: string;
-              source?: string;
-              description?: string;
-              sentiment?: string;
-            }) => ({
+        const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const jsonStart = cleaned.indexOf("[");
+        const jsonEnd = cleaned.lastIndexOf("]");
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const items: NewsItem[] = parsed.map((item: { title?: string; source?: string; description?: string; sentiment?: string }) => ({
               title: item.title || "Market Update",
-              source: item.source || "AI Analysis",
+              source: item.source || "AI Market Analysis",
               date: today,
               description: item.description || "",
               url: "#",
-              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
-                ? item.sentiment as "positive" | "negative" | "neutral"
-                : "neutral"),
+              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "") ? item.sentiment as "positive"|"negative"|"neutral" : inferSentiment(item.title || "")),
             }));
-            if (items.length > 0) {
-              cacheSet(cacheKey, items, CACHE_TTL.NEWS);
-              return items;
-            }
+            cacheSet(cacheKey, items, CACHE_TTL.NEWS);
+            return items;
           }
         }
       }
-    } catch { /* fall through */ }
+    } catch (e) {
+      console.error("Gemini news error:", e);
+    }
   }
 
-  // Try OpenRouter as fallback
+  // Try OpenRouter fallback
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) {
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${orKey}`,
+      const res = await fetchWithTimeout(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.0-flash-exp:free",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 1200,
+          }),
         },
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash-exp:free",
-          messages: [{ role: "user", content: prompt }],
-          max_tokens: 1000,
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
+        12000
+      );
       if (res.ok) {
         const data = await res.json();
-        const text = data.choices?.[0]?.message?.content ?? "";
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (Array.isArray(parsed)) {
-            const items: NewsItem[] = parsed.map((item: {
-              title?: string;
-              source?: string;
-              description?: string;
-              sentiment?: string;
-            }) => ({
+        const text: string = data.choices?.[0]?.message?.content ?? "";
+        const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const jsonStart = cleaned.indexOf("[");
+        const jsonEnd = cleaned.lastIndexOf("]");
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const items: NewsItem[] = parsed.map((item: { title?: string; source?: string; description?: string; sentiment?: string }) => ({
               title: item.title || "Market Update",
-              source: item.source || "AI Analysis",
+              source: item.source || "AI Market Analysis",
               date: today,
               description: item.description || "",
               url: "#",
-              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
-                ? item.sentiment as "positive" | "negative" | "neutral"
-                : "neutral"),
+              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "") ? item.sentiment as "positive"|"negative"|"neutral" : inferSentiment(item.title || "")),
             }));
-            if (items.length > 0) {
-              cacheSet(cacheKey, items, CACHE_TTL.NEWS);
-              return items;
-            }
+            cacheSet(cacheKey, items, CACHE_TTL.NEWS);
+            return items;
           }
         }
       }
-    } catch { /* fall through */ }
+    } catch (e) {
+      console.error("OpenRouter news error:", e);
+    }
   }
 
   return [];
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const symbols = searchParams.get("symbols")?.split(",").filter(Boolean) || [];
+  try {
+    const { searchParams } = new URL(request.url);
+    const symbols = searchParams.get("symbols")?.split(",").filter(Boolean) || [];
 
-  const companies = symbols
-    .map(s => SYMBOL_TO_COMPANY[s] || s.replace(".NS", "").replace("-USD", ""))
-    .filter(Boolean);
+    if (symbols.length === 0) {
+      return NextResponse.json([]);
+    }
 
-  const allNews: NewsItem[] = [];
-  const seenTitles = new Set<string>();
+    const companies = symbols
+      .map(s => SYMBOL_TO_COMPANY[s] || s.replace(".NS", "").replace("-USD", ""))
+      .filter(Boolean);
 
-  const addNews = (items: NewsItem[]) => {
-    for (const item of items) {
-      if (!seenTitles.has(item.title)) {
-        seenTitles.add(item.title);
-        allNews.push(item);
+    const allNews: NewsItem[] = [];
+    const seenTitles = new Set<string>();
+
+    const addNews = (items: NewsItem[]) => {
+      for (const item of items) {
+        if (!seenTitles.has(item.title)) {
+          seenTitles.add(item.title);
+          allNews.push(item);
+        }
+      }
+    };
+
+    // 1. Try newsdata.io per-symbol (parallel, max 3)
+    const ndResults = await Promise.allSettled(
+      companies.slice(0, 3).map(c => fetchFromNewsDataIO(c))
+    );
+    for (const r of ndResults) {
+      if (r.status === "fulfilled") addNews(r.value);
+    }
+
+    // 2. Use AI-generated news as primary or supplement
+    if (allNews.length < 6) {
+      try {
+        const aiItems = await generateAINews(companies);
+        addNews(aiItems);
+      } catch (e) {
+        console.error("AI news generation error:", e);
       }
     }
-  };
 
-  // 1. Try newsdata.io for each symbol
-  const ndFetches = companies.slice(0, 4).map(company => fetchFromNewsDataIO(company));
-  const ndResults = await Promise.allSettled(ndFetches);
-  for (const r of ndResults) {
-    if (r.status === "fulfilled") addNews(r.value);
+    allNews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return NextResponse.json(allNews.slice(0, 20));
+  } catch (error) {
+    console.error("News route error:", error);
+    return NextResponse.json([]);
   }
-
-  // 2. If newsdata.io returned nothing, use AI-generated news
-  if (allNews.length === 0 && companies.length > 0) {
-    const aiNews = await generateAINews(companies);
-    addNews(aiNews);
-  }
-
-  // 3. Supplement with AI news if we have < 6 items
-  if (allNews.length < 6 && companies.length > 0) {
-    const aiNews = await generateAINews(companies);
-    addNews(aiNews);
-  }
-
-  // Sort newest first
-  allNews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  return NextResponse.json(allNews.slice(0, 20));
 }
