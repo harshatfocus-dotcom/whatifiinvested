@@ -828,16 +828,24 @@ export default function Home() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {news.map((item, idx) => (
+                      {news.length === 0 ? (
+                        <div className="text-center py-6 text-text-muted text-sm">Loading news...</div>
+                      ) : news.map((item, idx) => (
                         <div key={idx} className="p-3 bg-background-tertiary rounded-lg hover:border-accent-tertiary/30 border border-transparent transition-all">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`w-2 h-2 rounded-full ${
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                               item.sentiment === "positive" ? "bg-accent-primary" :
                               item.sentiment === "negative" ? "bg-accent-secondary" : "bg-text-muted"
                             }`} />
                             <span className="text-xs text-text-muted">{item.source} • {item.date}</span>
                           </div>
-                          <h4 className="font-medium text-sm mb-1">{item.title}</h4>
+                          {item.url && item.url !== "#" ? (
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm mb-1 hover:text-accent-primary transition-colors block">
+                              {item.title}
+                            </a>
+                          ) : (
+                            <h4 className="font-medium text-sm mb-1">{item.title}</h4>
+                          )}
                           <p className="text-xs text-text-secondary line-clamp-2">{item.description}</p>
                         </div>
                       ))}

@@ -40,18 +40,35 @@ export async function POST(request: Request) {
         const backtest = runBacktest(strategyId, prices);
         if (!backtest) continue;
 
-        // Find the most recent BUY signal for entry price, most recent SELL for exit
-        const buySignals = backtest.signals.filter((s) => s.type === "BUY");
-        const sellSignals = backtest.signals.filter((s) => s.type === "SELL");
-        const lastBuy = buySignals[buySignals.length - 1];
-        const lastSell = sellSignals[sellSignals.length - 1];
+        // Entry = price at which to execute the current signal
+        // Exit  = realistic target price (profit target or stop)
+        const latestPrice = backtest.latestPrice;
+        let entryPrice: number;
+        let exitPrice: number;
+
+        if (backtest.latestSignal === "BUY") {
+          // Enter long at current price, target +15%
+          const lastBuySig = backtest.signals.filter(s => s.type === "BUY").at(-1);
+          entryPrice = lastBuySig?.price ?? latestPrice;
+          exitPrice = Math.round(entryPrice * 1.15);
+        } else if (backtest.latestSignal === "SELL") {
+          // Exit long / enter short at current price, target -12%
+          const lastSellSig = backtest.signals.filter(s => s.type === "SELL").at(-1);
+          entryPrice = lastSellSig?.price ?? latestPrice;
+          exitPrice = Math.round(entryPrice * 0.88);
+        } else {
+          // HOLD: show last known entry and a neutral range
+          const lastAnySig = backtest.signals.at(-1);
+          entryPrice = lastAnySig?.price ?? Math.round(latestPrice * 0.97);
+          exitPrice = Math.round(latestPrice * 1.05);
+        }
 
         results.push({
           strategy: backtest.strategyName,
           icon: backtest.icon,
           signal: backtest.latestSignal,
-          entryPrice: lastBuy?.price ?? backtest.latestPrice * 0.95,
-          exitPrice: lastSell?.price ?? backtest.latestPrice * 1.12,
+          entryPrice: Math.round(entryPrice * 100) / 100,
+          exitPrice: Math.round(exitPrice * 100) / 100,
           reasoning: backtest.reasoning,
           probability: backtest.confidence,
           graph: backtest.indicatorSeries.length > 0

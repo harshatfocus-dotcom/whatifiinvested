@@ -21,15 +21,29 @@ export async function GET(request: Request) {
   const results = strategyIds
     .map((id) => runBacktest(id, prices))
     .filter(Boolean)
-    .map((bt) => ({
-      name: bt!.strategyName,
-      icon: bt!.icon,
-      signal: bt!.latestSignal,
-      entryPrice: bt!.signals.filter((s) => s.type === "BUY").at(-1)?.price ?? bt!.latestPrice * 0.95,
-      exitPrice: bt!.signals.filter((s) => s.type === "SELL").at(-1)?.price ?? bt!.latestPrice * 1.12,
-      reasoning: bt!.reasoning,
-      probability: bt!.confidence,
-    }));
+    .map((bt) => {
+      const p = bt!.latestPrice;
+      let entryPrice: number, exitPrice: number;
+      if (bt!.latestSignal === "BUY") {
+        entryPrice = bt!.signals.filter(s => s.type === "BUY").at(-1)?.price ?? p;
+        exitPrice = Math.round(entryPrice * 1.15);
+      } else if (bt!.latestSignal === "SELL") {
+        entryPrice = bt!.signals.filter(s => s.type === "SELL").at(-1)?.price ?? p;
+        exitPrice = Math.round(entryPrice * 0.88);
+      } else {
+        entryPrice = bt!.signals.at(-1)?.price ?? Math.round(p * 0.97);
+        exitPrice = Math.round(p * 1.05);
+      }
+      return {
+        name: bt!.strategyName,
+        icon: bt!.icon,
+        signal: bt!.latestSignal,
+        entryPrice: Math.round(entryPrice * 100) / 100,
+        exitPrice: Math.round(exitPrice * 100) / 100,
+        reasoning: bt!.reasoning,
+        probability: bt!.confidence,
+      };
+    });
 
   return NextResponse.json(results);
 }

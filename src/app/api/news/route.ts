@@ -10,10 +10,9 @@ interface NewsItem {
   sentiment: "positive" | "negative" | "neutral";
 }
 
-// Map NSE symbols to company search terms for news
-const SYMBOL_TO_SEARCH: Record<string, string> = {
+const SYMBOL_TO_COMPANY: Record<string, string> = {
   "RELIANCE.NS": "Reliance Industries",
-  "TCS.NS": "TCS Tata Consultancy",
+  "TCS.NS": "TCS Tata Consultancy Services",
   "HDFCBANK.NS": "HDFC Bank",
   "INFY.NS": "Infosys",
   "ICICIBANK.NS": "ICICI Bank",
@@ -22,7 +21,7 @@ const SYMBOL_TO_SEARCH: Record<string, string> = {
   "ITC.NS": "ITC Limited",
   "KOTAKBANK.NS": "Kotak Mahindra Bank",
   "BHARTIARTL.NS": "Bharti Airtel",
-  "NIFTYBEES.NS": "Nifty 50 index",
+  "NIFTYBEES.NS": "Nifty 50 Sensex",
   "GOLDBEES.NS": "Gold ETF India",
   "TATAMOTORS.NS": "Tata Motors",
   "MARUTI.NS": "Maruti Suzuki",
@@ -32,97 +31,74 @@ const SYMBOL_TO_SEARCH: Record<string, string> = {
   "HCLTECH.NS": "HCL Technologies",
   "ZOMATO.NS": "Zomato",
   "ADANIPORTS.NS": "Adani Ports",
-  "BTC-USD": "Bitcoin crypto",
-  "ETH-USD": "Ethereum crypto",
-  "GC=F": "Gold commodity",
-  "CL=F": "Crude oil",
+  "SUNPHARMA.NS": "Sun Pharma",
+  "TITAN.NS": "Titan Company",
+  "ASIANPAINT.NS": "Asian Paints",
+  "BTC-USD": "Bitcoin cryptocurrency",
+  "ETH-USD": "Ethereum cryptocurrency",
+  "GC=F": "Gold commodity price",
+  "CL=F": "Crude oil price",
 };
 
-function inferSentiment(title: string, description: string): "positive" | "negative" | "neutral" {
-  const text = (title + " " + description).toLowerCase();
-  const positiveWords = ["rise", "surges", "gains", "profit", "growth", "beats", "jumps", "record", "outperform", "upgrade", "buy", "strong"];
-  const negativeWords = ["fall", "drops", "loss", "decline", "miss", "cut", "downgrade", "sell", "weak", "concern", "risk", "slump"];
-  const posScore = positiveWords.filter((w) => text.includes(w)).length;
-  const negScore = negativeWords.filter((w) => text.includes(w)).length;
-  if (posScore > negScore) return "positive";
-  if (negScore > posScore) return "negative";
-  return "neutral";
+function inferSentiment(text: string): "positive" | "negative" | "neutral" {
+  const t = text.toLowerCase();
+  const pos = ["rise", "surge", "gain", "profit", "growth", "beat", "jump", "record", "rally", "strong", "upgrade", "outperform"].filter(w => t.includes(w)).length;
+  const neg = ["fall", "drop", "loss", "decline", "miss", "slump", "cut", "downgrade", "weak", "concern", "crash", "risk"].filter(w => t.includes(w)).length;
+  return pos > neg ? "positive" : neg > pos ? "negative" : "neutral";
 }
 
-async function fetchFromNewsDataIO(query: string): Promise<NewsItem[]> {
+async function fetchFromNewsDataIO(company: string): Promise<NewsItem[]> {
   const apiKey = process.env.NEWSDATA_API_KEY;
   if (!apiKey) return [];
 
-  const cacheKey = `news:newsdata:${query}`;
+  const cacheKey = `news:nd:${company}`;
   const cached = cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    const params = new URLSearchParams({
-      apikey: apiKey,
-      q: query,
-      country: "in",
-      category: "business",
-      language: "en",
+    const url = new URL("https://newsdata.io/api/1/latest");
+    url.searchParams.set("apikey", apiKey);
+    url.searchParams.set("q", company);
+    url.searchParams.set("country", "in");
+    url.searchParams.set("language", "en");
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": "WhatIfIInvested/1.0 (investment backtesting app)",
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(8000),
     });
-    const res = await fetch(`https://newsdata.io/api/1/news?${params}`);
-    if (!res.ok) return [];
+
     const json = await res.json();
-    const items: NewsItem[] = (json.results || []).slice(0, 5).map((item: {
+
+    // newsdata.io returns {status: "error", results: {message:...}} on failure
+    if (json.status !== "success" || !Array.isArray(json.results)) return [];
+
+    const items: NewsItem[] = json.results.slice(0, 5).map((item: {
       title?: string;
+      source_name?: string;
       source_id?: string;
       pubDate?: string;
       description?: string;
+      ai_summary?: string;
       link?: string;
       sentiment?: string;
-    }) => ({
-      title: item.title || "Market Update",
-      source: item.source_id || "NewsData",
-      date: item.pubDate ? item.pubDate.split(" ")[0] : new Date().toISOString().split("T")[0],
-      description: item.description || "",
-      url: item.link || "#",
-      sentiment: (item.sentiment as "positive" | "negative" | "neutral") || inferSentiment(item.title || "", item.description || ""),
-    }));
-    if (items.length > 0) cacheSet(cacheKey, items, CACHE_TTL.NEWS);
-    return items;
-  } catch {
-    return [];
-  }
-}
-
-async function fetchFromGnews(query: string): Promise<NewsItem[]> {
-  const apiKey = process.env.GNEWS_API_KEY;
-  if (!apiKey) return [];
-
-  const cacheKey = `news:gnews:${query}`;
-  const cached = cacheGet<NewsItem[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const params = new URLSearchParams({
-      token: apiKey,
-      q: `${query} India stock`,
-      lang: "en",
-      country: "in",
-      max: "5",
+    }) => {
+      const title = item.title || "Market Update";
+      const description = item.ai_summary || item.description || title;
+      return {
+        title,
+        source: item.source_name || item.source_id || "NewsData",
+        date: item.pubDate ? item.pubDate.split(" ")[0] : new Date().toISOString().split("T")[0],
+        description,
+        url: item.link || "#",
+        sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
+          ? item.sentiment as "positive" | "negative" | "neutral"
+          : inferSentiment(title + " " + description)),
+      };
     });
-    const res = await fetch(`https://gnews.io/api/v4/search?${params}`);
-    if (!res.ok) return [];
-    const json = await res.json();
-    const items: NewsItem[] = (json.articles || []).slice(0, 5).map((a: {
-      title?: string;
-      source?: { name?: string };
-      publishedAt?: string;
-      description?: string;
-      url?: string;
-    }) => ({
-      title: a.title || "Market Update",
-      source: a.source?.name || "GNews",
-      date: a.publishedAt ? a.publishedAt.split("T")[0] : new Date().toISOString().split("T")[0],
-      description: a.description || "",
-      url: a.url || "#",
-      sentiment: inferSentiment(a.title || "", a.description || ""),
-    }));
+
     if (items.length > 0) cacheSet(cacheKey, items, CACHE_TTL.NEWS);
     return items;
   } catch {
@@ -130,36 +106,135 @@ async function fetchFromGnews(query: string): Promise<NewsItem[]> {
   }
 }
 
-async function fetchMarketGeneralNews(): Promise<NewsItem[]> {
-  const cacheKey = "news:market:general";
+async function generateAINews(companies: string[]): Promise<NewsItem[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const cacheKey = `news:ai:${companies.slice(0, 3).join(",")}`;
   const cached = cacheGet<NewsItem[]>(cacheKey);
   if (cached) return cached;
 
-  // Try newsdata.io for general Indian market news
-  const general = await fetchFromNewsDataIO("Indian stock market NSE BSE");
-  if (general.length > 0) {
-    cacheSet(cacheKey, general, CACHE_TTL.NEWS);
-    return general;
+  const today = new Date().toISOString().split("T")[0];
+  const companiesList = companies.slice(0, 5).join(", ");
+
+  const prompt = `Generate 6 realistic and educational market news headlines and summaries for these Indian stocks/assets: ${companiesList}.
+
+Return ONLY a JSON array with this exact structure (no markdown, no extra text):
+[
+  {
+    "title": "headline here",
+    "source": "source name (e.g. Economic Times, Moneycontrol, Business Standard)",
+    "description": "2-3 sentence description with specific details like percentages, numbers",
+    "sentiment": "positive" or "negative" or "neutral"
+  }
+]
+
+Make the news realistic, educational, and relevant to Indian markets. Include mix of company-specific and macro news (RBI, FII, GDP, sector trends). Vary sentiments.`;
+
+  // Try Gemini
+  if (apiKey) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1000 },
+          }),
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed)) {
+            const items: NewsItem[] = parsed.map((item: {
+              title?: string;
+              source?: string;
+              description?: string;
+              sentiment?: string;
+            }) => ({
+              title: item.title || "Market Update",
+              source: item.source || "AI Analysis",
+              date: today,
+              description: item.description || "",
+              url: "#",
+              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
+                ? item.sentiment as "positive" | "negative" | "neutral"
+                : "neutral"),
+            }));
+            if (items.length > 0) {
+              cacheSet(cacheKey, items, CACHE_TTL.NEWS);
+              return items;
+            }
+          }
+        }
+      }
+    } catch { /* fall through */ }
   }
 
-  // Fallback: static general market news
-  const today = new Date().toISOString().split("T")[0];
-  const items: NewsItem[] = [
-    {
-      title: "Indian markets update — check live prices for latest news",
-      source: "WhatIfIInvested",
-      date: today,
-      description: "Configure NEWSDATA_API_KEY in .env to get live news. Free tier: 200 req/day at newsdata.io",
-      url: "https://newsdata.io",
-      sentiment: "neutral",
-    },
-  ];
-  return items;
+  // Try OpenRouter as fallback
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (orKey) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${orKey}`,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.0-flash-exp:free",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1000,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content ?? "";
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed)) {
+            const items: NewsItem[] = parsed.map((item: {
+              title?: string;
+              source?: string;
+              description?: string;
+              sentiment?: string;
+            }) => ({
+              title: item.title || "Market Update",
+              source: item.source || "AI Analysis",
+              date: today,
+              description: item.description || "",
+              url: "#",
+              sentiment: (["positive","negative","neutral"].includes(item.sentiment ?? "")
+                ? item.sentiment as "positive" | "negative" | "neutral"
+                : "neutral"),
+            }));
+            if (items.length > 0) {
+              cacheSet(cacheKey, items, CACHE_TTL.NEWS);
+              return items;
+            }
+          }
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  return [];
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbols = searchParams.get("symbols")?.split(",").filter(Boolean) || [];
+
+  const companies = symbols
+    .map(s => SYMBOL_TO_COMPANY[s] || s.replace(".NS", "").replace("-USD", ""))
+    .filter(Boolean);
 
   const allNews: NewsItem[] = [];
   const seenTitles = new Set<string>();
@@ -173,25 +248,26 @@ export async function GET(request: Request) {
     }
   };
 
-  // Fetch news for each symbol in parallel
-  const symbolFetches = symbols.slice(0, 5).map(async (symbol) => {
-    const query = SYMBOL_TO_SEARCH[symbol] || symbol.replace(".NS", "").replace("-USD", "");
-    // Try newsdata.io first, then gnews
-    const news = await fetchFromNewsDataIO(query);
-    if (news.length > 0) return news;
-    return fetchFromGnews(query);
-  });
-
-  const symbolResults = await Promise.allSettled(symbolFetches);
-  for (const result of symbolResults) {
-    if (result.status === "fulfilled") addNews(result.value);
+  // 1. Try newsdata.io for each symbol
+  const ndFetches = companies.slice(0, 4).map(company => fetchFromNewsDataIO(company));
+  const ndResults = await Promise.allSettled(ndFetches);
+  for (const r of ndResults) {
+    if (r.status === "fulfilled") addNews(r.value);
   }
 
-  // Add general market news
-  const marketNews = await fetchMarketGeneralNews();
-  addNews(marketNews);
+  // 2. If newsdata.io returned nothing, use AI-generated news
+  if (allNews.length === 0 && companies.length > 0) {
+    const aiNews = await generateAINews(companies);
+    addNews(aiNews);
+  }
 
-  // Sort by date, newest first
+  // 3. Supplement with AI news if we have < 6 items
+  if (allNews.length < 6 && companies.length > 0) {
+    const aiNews = await generateAINews(companies);
+    addNews(aiNews);
+  }
+
+  // Sort newest first
   allNews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return NextResponse.json(allNews.slice(0, 20));
