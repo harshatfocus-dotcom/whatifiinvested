@@ -101,16 +101,41 @@ Assets: ${assets?.map((a: any) => `${a.symbol} (${a.name})`).join(", ") || "N/A"
       }
     }
 
-    // Fallback responses if no AI API available
-    const fallbackResponses = [
-      "Based on your portfolio analysis, you've achieved a solid return. Remember that past performance doesn't guarantee future results. The key insight here is the power of consistent investing over time.",
-      "Your portfolio shows the value of diversification. By spreading investments across multiple assets, you reduce risk while capturing growth from different sectors.",
-      "The simulation demonstrates how Dollar Cost Averaging helps navigate market volatility. By investing regularly, you buy more units when prices are low and fewer when high.",
-      "Comparing to Nifty 50 benchmark helps contextualize your performance. A diversified portfolio like yours typically provides better risk-adjusted returns over the long term.",
-    ];
+    // Smart fallback responses based on actual portfolio data
+    const totalInvested = portfolio?.totalInvested || 0;
+    const currentValue = portfolio?.currentValue || 0;
+    const percentReturn = portfolio?.percentReturn || 0;
+    const cagr = portfolio?.cagr || 0;
+    const assetsList = assets?.map((a: any) => a.symbol).join(", ") || "N/A";
+    
+    const getFallbackResponse = () => {
+      const responses = [];
+      
+      if (percentReturn > 20) {
+        responses.push(`Your portfolio has delivered an excellent ${percentReturn.toFixed(1)}% return! This significantly outperforms many traditional savings options.`);
+      } else if (percentReturn > 10) {
+        responses.push(`Your portfolio returned ${percentReturn.toFixed(1)}%, which is a solid performance. The CAGR of ${cagr.toFixed(1)}% shows consistent growth.`);
+      } else if (percentReturn > 0) {
+        responses.push(`Your portfolio is up ${percentReturn.toFixed(1)}%. While modest, remember that steady returns compound over time.`);
+      } else {
+        responses.push(`Your portfolio is currently down ${Math.abs(percentReturn).toFixed(1)}%. Market downturns are normal - historically markets recover.`);
+      }
+      
+      if (cagr > 15) {
+        responses.push(` The ${cagr.toFixed(1)}% CAGR is impressive and shows strong annualized growth.`);
+      }
+      
+      responses.push(` Your portfolio contains: ${assetsList}.`);
+      
+      if (percentReturn > 15) {
+        responses.push(" Consider that this is past performance - future results may differ.");
+      }
+      
+      return responses.join(" ");
+    };
 
-    const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-    return NextResponse.json({ response: randomResponse });
+    const response = getFallbackResponse();
+    return NextResponse.json({ response });
   } catch (error) {
     console.error("AI chat error:", error);
     return NextResponse.json(

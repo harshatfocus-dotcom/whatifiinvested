@@ -125,36 +125,52 @@ export async function POST(request: Request) {
     const holdings: Holding[] = [];
     const allChartData: ChartDataPoint[] = [];
 
+    // Calculate years of investment
+    const start = new Date(startDate);
+    const end = new Date();
+    const years = Math.max(0.1, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365));
+    
+    // Calculate monthly recurring investments count
+    const monthsInvested = Math.floor(years * 12);
+    const totalRecurring = (recurringAmount || 0) * monthsInvested;
+    totalInvested += totalRecurring;
+
     for (const asset of normalizedAssets) {
       const currentPrice = CURRENT_PRICES[asset.symbol] || 100;
-      const investedAmount = initialInvestment * asset.normalizedWeight;
-      const currentValue = investedAmount * (currentPrice / (currentPrice * 0.7));
-      const quantity = investedAmount / (currentPrice * 0.7);
       
-      const returnAmount = currentValue - investedAmount;
-      const returnPercent = ((currentValue - investedAmount) / investedAmount) * 100;
+      // Simulate starting price (assume 30% lower than current - realistic for 5 year period)
+      const startPrice = currentPrice * 0.7;
+      
+      // Split investment: 50% initial, 50% from recurring (spread over time)
+      const initialInvested = initialInvestment * asset.normalizedWeight;
+      const recurringInvested = totalRecurring * asset.normalizedWeight;
+      const totalAssetInvested = initialInvested + recurringInvested;
+      
+      // Calculate average purchase price (assume gradual buying at average price)
+      const avgBuyPrice = (startPrice + currentPrice) / 2;
+      const quantity = totalAssetInvested / avgBuyPrice;
+      const currentValue = quantity * currentPrice;
+      
+      const returnAmount = currentValue - totalAssetInvested;
+      const returnPercent = totalAssetInvested > 0 ? ((currentValue - totalAssetInvested) / totalAssetInvested) * 100 : 0;
 
       holdings.push({
         symbol: asset.symbol,
         name: asset.name,
         quantity: Math.round(quantity * 100) / 100,
-        avgBuyPrice: Math.round(currentPrice * 0.7 * 100) / 100,
+        avgBuyPrice: Math.round(avgBuyPrice * 100) / 100,
         currentPrice,
         currentValue: Math.round(currentValue),
-        investedAmount: Math.round(investedAmount),
+        investedAmount: Math.round(totalAssetInvested),
         returnAmount: Math.round(returnAmount),
         returnPercent: Math.round(returnPercent * 100) / 100,
       });
-
-      totalInvested += recurringAmount || 0;
     }
 
     const totalCurrentValue = holdings.reduce((sum, h) => sum + h.currentValue, 0);
     const absoluteReturn = totalCurrentValue - totalInvested;
-    const percentReturn = ((totalCurrentValue - totalInvested) / totalInvested) * 100;
+    const percentReturn = totalInvested > 0 ? ((totalCurrentValue - totalInvested) / totalInvested) * 100 : 0;
 
-    const start = new Date(startDate);
-    const years = (new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
     const cagr = Math.pow(totalCurrentValue / totalInvested, 1 / years) - 1;
 
     const sortedHoldings = [...holdings].sort((a, b) => b.returnPercent - a.returnPercent);
