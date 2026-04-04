@@ -1,45 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, PieChart, Lightbulb, Newspaper, ArrowRight, Sparkles, TrendingUp, TrendingDown, AlertTriangle, BarChart3, RefreshCw, Bot, Info, Zap, Target, Shield } from "lucide-react";
+import { Search, X, PieChart, Lightbulb, Newspaper, ArrowRight, Sparkles, TrendingUp, TrendingDown, AlertTriangle, BarChart3, RefreshCw, Bot, Bitcoin, Gem, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PerformanceChart } from "@/components/charts/performance-chart";
-import type { Asset, PortfolioAnalysis, Strategy, NewsItem, SignalPoint } from "@/types";
+import type { Asset, PortfolioAnalysis, Strategy, NewsItem } from "@/types";
 
-const POPULAR_STOCKS: Asset[] = [
-  { symbol: "RELIANCE.NS", name: "Reliance Industries", type: "stock", exchange: "NSE", currentPrice: 2950, priceChange: 25, priceChangePercent: 0.85, high52w: 3200, low52w: 2400 },
-  { symbol: "TCS.NS", name: "Tata Consultancy Services", type: "stock", exchange: "NSE", currentPrice: 4200, priceChange: -15, priceChangePercent: -0.36, high52w: 4500, low52w: 3500 },
-  { symbol: "HDFCBANK.NS", name: "HDFC Bank", type: "stock", exchange: "NSE", currentPrice: 1680, priceChange: 42, priceChangePercent: 2.56, high52w: 1800, low52w: 1300 },
-  { symbol: "INFY.NS", name: "Infosys", type: "stock", exchange: "NSE", currentPrice: 1900, priceChange: -8, priceChangePercent: -0.42, high52w: 2100, low52w: 1500 },
-  { symbol: "ICICIBANK.NS", name: "ICICI Bank", type: "stock", exchange: "NSE", currentPrice: 1200, priceChange: 18, priceChangePercent: 1.52, high52w: 1300, low52w: 900 },
-  { symbol: "SBIN.NS", name: "State Bank of India", type: "stock", exchange: "NSE", currentPrice: 820, priceChange: -5, priceChangePercent: -0.61, high52w: 900, low52w: 650 },
-  { symbol: "HINDUNILVR.NS", name: "Hindustan Unilever", type: "stock", exchange: "NSE", currentPrice: 2850, priceChange: 12, priceChangePercent: 0.42, high52w: 3000, low52w: 2400 },
-  { symbol: "ITC.NS", name: "ITC Limited", type: "stock", exchange: "NSE", currentPrice: 450, priceChange: 5, priceChangePercent: 1.12, high52w: 480, low52w: 380 },
-  { symbol: "KOTAKBANK.NS", name: "Kotak Mahindra Bank", type: "stock", exchange: "NSE", currentPrice: 1850, priceChange: -20, priceChangePercent: -1.07, high52w: 2000, low52w: 1500 },
-  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel", type: "stock", exchange: "NSE", currentPrice: 1580, priceChange: 25, priceChangePercent: 1.61, high52w: 1700, low52w: 1200 },
-];
-
-const POPULAR_ETFS: Asset[] = [
-  { symbol: "NIFTYBEES.NS", name: "Nifty 50 ETF", type: "etf", exchange: "NSE", currentPrice: 250, priceChange: 3.5, priceChangePercent: 1.42, high52w: 270, low52w: 210 },
-  { symbol: "GOLDBEES.NS", name: "Gold ETF", type: "etf", exchange: "NSE", currentPrice: 58, priceChange: 0.8, priceChangePercent: 1.4, high52w: 62, low52w: 48 },
-  { symbol: "SILVERBEES.NS", name: "Silver ETF", type: "etf", exchange: "NSE", currentPrice: 125, priceChange: -2, priceChangePercent: -1.57, high52w: 140, low52w: 95 },
-  { symbol: "MON100.NS", name: "Motilal Oswal NASDAQ 100", type: "etf", exchange: "NSE", currentPrice: 850, priceChange: 12, priceChangePercent: 1.43, high52w: 920, low52w: 680 },
-  { symbol: "MID100BEES.NS", name: "Nifty Midcap 100 ETF", type: "etf", exchange: "NSE", currentPrice: 320, priceChange: 5, priceChangePercent: 1.59, high52w: 350, low52w: 260 },
-  { symbol: "SBIETFNSGOLD.NS", name: "SBI Gold ETF", type: "etf", exchange: "NSE", currentPrice: 5800, priceChange: 45, priceChangePercent: 0.78, high52w: 6200, low52w: 4800 },
-];
-
-const POPULAR_MFS: Asset[] = [
-  { symbol: "MF001", name: "HDFC Top 100 Fund", type: "mutual_fund", exchange: "MF", currentPrice: 850, priceChange: 5, priceChangePercent: 0.59, high52w: 900, low52w: 720 },
-  { symbol: "MF002", name: "SBI Bluechip Fund", type: "mutual_fund", exchange: "MF", currentPrice: 72, priceChange: 0.4, priceChangePercent: 0.56, high52w: 76, low52w: 62 },
-  { symbol: "MF003", name: "ICICI Prudential Bluechip", type: "mutual_fund", exchange: "MF", currentPrice: 78, priceChange: 0.6, priceChangePercent: 0.78, high52w: 82, low52w: 65 },
-  { symbol: "MF004", name: "Mirae Asset Large Cap", type: "mutual_fund", exchange: "MF", currentPrice: 42, priceChange: 0.2, priceChangePercent: 0.48, high52w: 45, low52w: 35 },
-  { symbol: "MF005", name: "Axis Bluechip Fund", type: "mutual_fund", exchange: "MF", currentPrice: 58, priceChange: 0.3, priceChangePercent: 0.52, high52w: 62, low52w: 48 },
-  { symbol: "MF006", name: "Kotak Bluechip Fund", type: "mutual_fund", exchange: "MF", currentPrice: 42, priceChange: 0.15, priceChangePercent: 0.36, high52w: 45, low52w: 35 },
-];
+interface AssetItem {
+  symbol: string;
+  name: string;
+  sector?: string;
+  category?: string;
+  assetType: string;
+  currentPrice?: number;
+  priceChange?: number;
+  priceChangePercent?: number;
+  high52w?: number;
+  low52w?: number;
+}
 
 const ALL_STRATEGIES = [
   { id: "sma_crossover", name: "SMA Crossover", icon: "📈", description: "Buy when 50-day MA crosses above 200-day MA" },
@@ -91,11 +72,74 @@ export default function Home() {
   const [userQuestion, setUserQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [activeStrategies, setActiveStrategies] = useState<string[]>(["sma_crossover", "rsi", "macd", "dca"]);
+  const [allAssets, setAllAssets] = useState<AssetItem[]>([]);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [assetsLoading, setAssetsLoading] = useState(false);
 
-  const addAsset = (asset: Asset) => {
+  useEffect(() => {
+    loadAssets();
+  }, []);
+
+  const loadAssets = async () => {
+    setAssetsLoading(true);
+    try {
+      const response = await fetch("/api/assets/all?type=all");
+      if (response.ok) {
+        const data = await response.json();
+        setAllAssets(data);
+      }
+    } catch (error) {
+      console.error("Failed to load assets:", error);
+    } finally {
+      setAssetsLoading(false);
+    }
+  };
+
+  const filteredAssets = useMemo(() => {
+    let filtered = allAssets;
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter(a => a.assetType === selectedCategory);
+    }
+    if (assetSearch) {
+      const search = assetSearch.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.symbol.toLowerCase().includes(search) || 
+        a.name.toLowerCase().includes(search)
+      );
+    }
+    return filtered.slice(0, 50);
+  }, [allAssets, selectedCategory, assetSearch]);
+
+  const getAssetIcon = (type: string) => {
+    switch (type) {
+      case "stock": return "📈";
+      case "etf": return "🎯";
+      case "mutual_fund": return "💼";
+      case "commodity": return "🥇";
+      case "index": return "📊";
+      case "crypto": return "₿";
+      default: return "💰";
+    }
+  };
+
+  const addAsset = (asset: AssetItem) => {
     if (selectedAssets.length >= 10) return;
     if (selectedAssets.find((a) => a.symbol === asset.symbol)) return;
-    const newAssets = [...selectedAssets, asset];
+    
+    const assetToAdd: Asset = {
+      symbol: asset.symbol,
+      name: asset.name,
+      type: asset.assetType as any,
+      exchange: asset.assetType === "crypto" ? "CRYPTO" : asset.assetType === "commodity" ? "MCX" : "NSE",
+      currentPrice: asset.currentPrice || 100,
+      priceChange: asset.priceChange || 0,
+      priceChangePercent: asset.priceChangePercent || 0,
+      high52w: asset.high52w || 100,
+      low52w: asset.low52w || 100,
+    };
+    
+    const newAssets = [...selectedAssets, assetToAdd];
     setSelectedAssets(newAssets);
     const equalWeight = Math.floor(100 / newAssets.length);
     const newWeights: Record<string, number> = {};
@@ -289,61 +333,80 @@ export default function Home() {
                   Add assets to build your <span className="text-gradient">basket</span>
                 </h2>
                 <p className="text-text-secondary text-lg max-w-2xl mx-auto">
-                  Select up to 10 assets from Stocks, ETFs, and Mutual Funds
+                  Select up to 10 assets from Indian markets - Stocks, ETFs, Mutual Funds, Commodities, Crypto & more
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {["stocks", "etfs", "mfs"].map((tab) => (
-                  <Card key={tab} className="cursor-pointer hover:border-accent-tertiary/50 transition-all" onClick={() => setActiveTab(tab)}>
-                    <CardContent className="p-6 text-center">
-                      <div className="text-3xl mb-2">
-                        {tab === "stocks" ? "📈" : tab === "etfs" ? "🎯" : "💼"}
-                      </div>
-                      <h3 className="font-semibold text-lg mb-1">{tab === "stocks" ? "Stocks" : tab === "etfs" ? "ETFs" : "Mutual Funds"}</h3>
-                      <p className="text-text-muted text-sm">
-                        {tab === "stocks" ? "NSE listed companies" : tab === "etfs" ? "Exchange Traded Funds" : "Indian MF schemes"}
-                      </p>
-                    </CardContent>
-                  </Card>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                {[
+                  { id: "all", icon: "🌐", label: "All Assets" },
+                  { id: "stock", icon: "📈", label: "Stocks (50)" },
+                  { id: "etf", icon: "🎯", label: "ETFs" },
+                  { id: "mutual_fund", icon: "💼", label: "MFs" },
+                  { id: "commodity", icon: "🥇", label: "Commodities" },
+                  { id: "crypto", icon: "₿", label: "Crypto" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`p-3 rounded-xl text-center transition-all ${
+                      selectedCategory === cat.id
+                        ? "bg-accent-tertiary text-white"
+                        : "bg-background-tertiary text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <div className="text-xl mb-1">{cat.icon}</div>
+                    <div className="text-xs font-medium">{cat.label}</div>
+                  </button>
                 ))}
               </div>
 
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>{activeTab === "stocks" ? "Popular Stocks" : activeTab === "etfs" ? "Popular ETFs" : "Popular Mutual Funds"}</span>
+                    <span>Search Assets</span>
                     <span className="text-text-muted text-sm">{selectedAssets.length}/10 selected</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {(activeTab === "stocks" ? POPULAR_STOCKS : activeTab === "etfs" ? POPULAR_ETFS : POPULAR_MFS).map((asset) => {
-                      const isSelected = selectedAssets.find(a => a.symbol === asset.symbol);
-                      return (
-                        <motion.button
-                          key={asset.symbol}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => isSelected ? removeAsset(asset.symbol) : addAsset(asset)}
-                          className={`p-4 rounded-xl text-left transition-all border ${
-                            isSelected 
-                              ? "bg-accent-tertiary/20 border-accent-tertiary" 
-                              : "bg-background-tertiary border-transparent hover:border-accent-tertiary/50"
-                          }`}
-                        >
-                          <div className="font-medium text-sm">{asset.symbol.replace(".NS", "").replace("MF", "")}</div>
-                          <div className="text-xs text-text-muted truncate">{asset.name}</div>
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="font-semibold">₹{asset.currentPrice}</span>
-                            <span className={`text-xs ${asset.priceChangePercent >= 0 ? "text-accent-primary" : "text-accent-secondary"}`}>
-                              {asset.priceChangePercent >= 0 ? "+" : ""}{asset.priceChangePercent.toFixed(1)}%
-                            </span>
-                          </div>
-                        </motion.button>
-                      );
-                    })}
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
+                    <Input
+                      placeholder="Search by name or symbol..."
+                      value={assetSearch}
+                      onChange={(e) => setAssetSearch(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
+                  {assetsLoading ? (
+                    <div className="text-center py-8 text-text-muted">Loading assets...</div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 max-h-96 overflow-y-auto">
+                      {filteredAssets.map((asset) => {
+                        const isSelected = selectedAssets.find(a => a.symbol === asset.symbol);
+                        return (
+                          <motion.button
+                            key={asset.symbol}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => isSelected ? removeAsset(asset.symbol) : addAsset(asset)}
+                            className={`p-3 rounded-xl text-left transition-all border ${
+                              isSelected 
+                                ? "bg-accent-tertiary/20 border-accent-tertiary" 
+                                : "bg-background-tertiary border-transparent hover:border-accent-tertiary/50"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1 mb-1">
+                              <span>{getAssetIcon(asset.assetType)}</span>
+                              <div className="font-medium text-sm truncate">{asset.symbol.replace(".NS", "").replace("-USD", "")}</div>
+                            </div>
+                            <div className="text-xs text-text-muted truncate">{asset.name}</div>
+                            <div className="text-xs text-text-muted mt-1">{asset.category || asset.sector || asset.assetType}</div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
