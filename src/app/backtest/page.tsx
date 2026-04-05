@@ -365,7 +365,7 @@ function AssetIcon({ symbol, name, type, size = 36 }: {
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`https://financialmodelingprep.com/image-stock/${fmpSymbol}.png`}
+          src={`/api/assets/logo?symbol=${fmpSymbol}`}
           alt={name}
           width={size * 0.9}
           height={size * 0.9}
