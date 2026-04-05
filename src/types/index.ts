@@ -1,13 +1,14 @@
 export interface Asset {
   symbol: string;
   name: string;
-  type: "stock" | "etf" | "mutual_fund" | "commodity" | "index" | "crypto";
+  type: "stock" | "us_stock" | "etf" | "mutual_fund" | "commodity" | "index" | "crypto";
   exchange: string;
   currentPrice: number;
   priceChange: number;
   priceChangePercent: number;
   high52w: number;
   low52w: number;
+  currency?: string; // "INR" or "USD"
 }
 
 export interface PortfolioAsset {
@@ -30,6 +31,38 @@ export interface Holding {
   investedAmount: number;
   returnAmount: number;
   returnPercent: number;
+  // USD fields — only set for US stocks, all values are INR-converted
+  currency?: string;        // "USD" if US stock, "INR" otherwise
+  currentPriceUSD?: number; // Current price in USD
+  avgBuyPriceUSD?: number;  // Average buy price in USD
+  currentValueUSD?: number; // Current value in USD
+}
+
+export interface DrawdownPoint {
+  date: string;
+  drawdown: number; // negative %, e.g. -23.5
+}
+
+export interface RiskSnapshot {
+  maxDrawdown: number;    // % e.g. 23.5
+  volatility: number;     // annualised % e.g. 18.2
+  sharpeRatio: number;    // e.g. 1.24
+  bestMonth: number;      // best monthly return %
+  worstMonth: number;     // worst monthly return %
+  positiveMonthsPct: number; // % of months positive
+}
+
+export interface BenchmarkData {
+  nifty?: ChartDataPoint[];
+  gold?: ChartDataPoint[];
+  fd?: ChartDataPoint[];
+}
+
+export interface LumpSumComparison {
+  currentValue: number;
+  cagr: number;
+  percentReturn: number;
+  chartData: ChartDataPoint[];
 }
 
 export interface PortfolioAnalysis {
@@ -40,9 +73,16 @@ export interface PortfolioAnalysis {
   cagr: number;
   holdings: Holding[];
   chartData: ChartDataPoint[];
+  assetChartData?: Record<string, ChartDataPoint[]>;
   bestPerformer: { symbol: string; returnPercent: number };
   worstPerformer: { symbol: string; returnPercent: number };
   signals?: SignalPoint[];
+  riskMetrics?: RiskSnapshot;
+  drawdownSeries?: DrawdownPoint[];
+  benchmarks?: BenchmarkData;
+  lumpSumComparison?: LumpSumComparison;
+  correlationMatrix?: number[][];
+  correlationSymbols?: string[];
 }
 
 export interface ChartDataPoint {

@@ -71,7 +71,7 @@ async function fetchFromNewsDataIO(company: string): Promise<NewsItem[]> {
     const res = await fetchWithTimeout(
       `https://newsdata.io/api/1/latest?${params}`,
       { headers: { "User-Agent": "Mozilla/5.0 WhatIfIInvested/1.0" } },
-      8000
+      3500
     );
 
     if (!res.ok) return [];
@@ -131,10 +131,10 @@ Mix company-specific and macro Indian market news (RBI policy, FII flows, GDP, s
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+            generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
           }),
         },
-        12000
+        5000
       );
       if (res.ok) {
         const data = await res.json();
@@ -173,12 +173,12 @@ Mix company-specific and macro Indian market news (RBI policy, FII flows, GDP, s
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}` },
           body: JSON.stringify({
-            model: "google/gemini-2.0-flash-exp:free",
+            model: "qwen/qwen3.6-plus:free",
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 1200,
+            max_tokens: 800,
           }),
         },
-        12000
+        5000
       );
       if (res.ok) {
         const data = await res.json();
@@ -210,6 +210,37 @@ Mix company-specific and macro Indian market news (RBI policy, FII flows, GDP, s
   return [];
 }
 
+function getStaticFallbackNews(companies: string[]): NewsItem[] {
+  const today = new Date().toISOString().split("T")[0];
+  const company = companies[0] || "Indian markets";
+  return [
+    {
+      title: `${company} — Market Update`,
+      source: "Market Snapshot",
+      date: today,
+      description: "Indian equity markets continue to track global cues. FII activity and RBI policy remain key near-term drivers.",
+      url: `https://www.google.com/search?q=${encodeURIComponent(company + " stock news")}&tbm=nws`,
+      sentiment: "neutral",
+    },
+    {
+      title: "Nifty 50 Outlook: Analyst Views",
+      source: "Market Snapshot",
+      date: today,
+      description: "Analysts expect range-bound trading as markets await US Fed signals and domestic earnings cues.",
+      url: "https://www.google.com/search?q=Nifty+50+outlook+today&tbm=nws",
+      sentiment: "neutral",
+    },
+    {
+      title: "RBI Policy Watch: Rate Decision Ahead",
+      source: "Market Snapshot",
+      date: today,
+      description: "The Reserve Bank of India's monetary policy stance continues to influence bond yields and banking sector stocks.",
+      url: "https://www.google.com/search?q=RBI+policy+rate+India&tbm=nws",
+      sentiment: "neutral",
+    },
+  ];
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -235,22 +266,36 @@ export async function GET(request: Request) {
       }
     };
 
-    // 1. Try newsdata.io per-symbol (parallel, max 3)
-    const ndResults = await Promise.allSettled(
-      companies.slice(0, 3).map(c => fetchFromNewsDataIO(c))
-    );
-    for (const r of ndResults) {
-      if (r.status === "fulfilled") addNews(r.value);
-    }
-
-    // 2. Use AI-generated news as primary or supplement
-    if (allNews.length < 6) {
-      try {
-        const aiItems = await generateAINews(companies);
-        addNews(aiItems);
-      } catch (e) {
-        console.error("AI news generation error:", e);
+    // Run newsdata.io + AI generation in parallel with a hard 8s overall cap
+    const fetchAll = async () => {
+      // 1. Try newsdata.io per-symbol (parallel, max 2)
+      const ndResults = await Promise.allSettled(
+        companies.slice(0, 2).map(c => fetchFromNewsDataIO(c))
+      );
+      for (const r of ndResults) {
+        if (r.status === "fulfilled") addNews(r.value);
       }
+
+      // 2. Use AI-generated news as primary or supplement
+      if (allNews.length < 4) {
+        try {
+          const aiItems = await generateAINews(companies);
+          addNews(aiItems);
+        } catch (e) {
+          console.error("AI news generation error:", e);
+        }
+      }
+    };
+
+    // Hard 8s timeout for the entire fetch pipeline
+    await Promise.race([
+      fetchAll(),
+      new Promise<void>(resolve => setTimeout(resolve, 8000)),
+    ]);
+
+    // Always fall back to static news if nothing came through
+    if (allNews.length === 0) {
+      addNews(getStaticFallbackNews(companies));
     }
 
     allNews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

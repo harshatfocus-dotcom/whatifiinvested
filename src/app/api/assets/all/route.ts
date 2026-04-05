@@ -42,7 +42,6 @@ const NIFTY_50_STOCKS = [
   { symbol: "TATACONSUM.NS", name: "Tata Consumer Products Ltd", sector: "FMCG" },
   { symbol: "TATAMOTORS.NS", name: "Tata Motors Ltd", sector: "Automobile" },
   { symbol: "TATASTEEL.NS", name: "Tata Steel Ltd", sector: "Steel" },
-  { symbol: "TCS.NS", name: "Tata Consultancy Services Ltd", sector: "IT" },
   { symbol: "TECHM.NS", name: "Tech Mahindra Ltd", sector: "IT" },
   { symbol: "TITAN.NS", name: "Titan Company Ltd", sector: "Jewelry" },
   { symbol: "ULTRACEMCO.NS", name: "UltraTech Cement Ltd", sector: "Cement" },
@@ -130,6 +129,41 @@ const MUTUAL_FUNDS = [
   { symbol: "MF050", name: "Nutritional Small Cap Fund - Growth", category: "Small Cap" },
 ];
 
+const US_STOCKS = [
+  { symbol: "AAPL",  name: "Apple Inc.",                   sector: "Technology",    currency: "USD" },
+  { symbol: "MSFT",  name: "Microsoft Corporation",         sector: "Technology",    currency: "USD" },
+  { symbol: "GOOGL", name: "Alphabet Inc. (Google)",        sector: "Technology",    currency: "USD" },
+  { symbol: "AMZN",  name: "Amazon.com Inc.",               sector: "E-Commerce",    currency: "USD" },
+  { symbol: "NVDA",  name: "NVIDIA Corporation",            sector: "Semiconductors",currency: "USD" },
+  { symbol: "META",  name: "Meta Platforms Inc.",           sector: "Social Media",  currency: "USD" },
+  { symbol: "TSLA",  name: "Tesla Inc.",                    sector: "EV / Auto",     currency: "USD" },
+  { symbol: "JPM",   name: "JPMorgan Chase & Co.",          sector: "Banking",       currency: "USD" },
+  { symbol: "V",     name: "Visa Inc.",                     sector: "Fintech",       currency: "USD" },
+  { symbol: "MA",    name: "Mastercard Inc.",               sector: "Fintech",       currency: "USD" },
+  { symbol: "UNH",   name: "UnitedHealth Group Inc.",       sector: "Healthcare",    currency: "USD" },
+  { symbol: "WMT",   name: "Walmart Inc.",                  sector: "Retail",        currency: "USD" },
+  { symbol: "XOM",   name: "ExxonMobil Corporation",        sector: "Oil & Gas",     currency: "USD" },
+  { symbol: "JNJ",   name: "Johnson & Johnson",             sector: "Healthcare",    currency: "USD" },
+  { symbol: "PG",    name: "Procter & Gamble Co.",          sector: "FMCG",          currency: "USD" },
+  { symbol: "HD",    name: "The Home Depot Inc.",           sector: "Retail",        currency: "USD" },
+  { symbol: "BAC",   name: "Bank of America Corp.",         sector: "Banking",       currency: "USD" },
+  { symbol: "ADBE",  name: "Adobe Inc.",                    sector: "Software",      currency: "USD" },
+  { symbol: "NFLX",  name: "Netflix Inc.",                  sector: "Streaming",     currency: "USD" },
+  { symbol: "AMD",   name: "Advanced Micro Devices Inc.",   sector: "Semiconductors",currency: "USD" },
+  { symbol: "ORCL",  name: "Oracle Corporation",            sector: "Software",      currency: "USD" },
+  { symbol: "CRM",   name: "Salesforce Inc.",               sector: "Software",      currency: "USD" },
+  { symbol: "COST",  name: "Costco Wholesale Corporation",  sector: "Retail",        currency: "USD" },
+  { symbol: "DIS",   name: "The Walt Disney Company",       sector: "Entertainment", currency: "USD" },
+  { symbol: "UBER",  name: "Uber Technologies Inc.",        sector: "Mobility",      currency: "USD" },
+  { symbol: "COIN",  name: "Coinbase Global Inc.",          sector: "Crypto",        currency: "USD" },
+  { symbol: "PLTR",  name: "Palantir Technologies Inc.",    sector: "AI / Defence",  currency: "USD" },
+  { symbol: "INTC",  name: "Intel Corporation",             sector: "Semiconductors",currency: "USD" },
+  { symbol: "PYPL",  name: "PayPal Holdings Inc.",          sector: "Fintech",       currency: "USD" },
+  { symbol: "SPOT",  name: "Spotify Technology S.A.",       sector: "Streaming",     currency: "USD" },
+  { symbol: "SHOP",  name: "Shopify Inc.",                  sector: "E-Commerce",    currency: "USD" },
+  { symbol: "SQ",    name: "Block Inc. (Square)",           sector: "Fintech",       currency: "USD" },
+];
+
 const COMMODITIES = [
   { symbol: "GC=F", name: "Gold Futures", category: "Precious Metals" },
   { symbol: "SI=F", name: "Silver Futures", category: "Precious Metals" },
@@ -147,8 +181,6 @@ const COMMODITIES = [
   { symbol: "KC=F", name: "Coffee Futures", category: "Agriculture" },
   { symbol: "CT=F", name: "Cotton Futures", category: "Agriculture" },
   { symbol: "OJ=F", name: "Orange Juice Futures", category: "Agriculture" },
-  { symbol: "Lumber Futures", name: "Lumber Futures", category: "Agriculture" },
-  { symbol: "Rubber Futures", name: "Rubber Futures", category: "Agriculture" },
 ];
 
 const INDEXES = [
@@ -203,12 +235,13 @@ export async function GET(request: Request) {
 
   let results = [];
   
-  if (type === "all" || type === "stocks") results.push(...NIFTY_50_STOCKS.map(s => ({ ...s, assetType: "stock" })));
-  if (type === "all" || type === "etfs") results.push(...ETFS.map(s => ({ ...s, assetType: "etf" })));
-  if (type === "all" || type === "mfs") results.push(...MUTUAL_FUNDS.map(s => ({ ...s, assetType: "mutual_fund" })));
-  if (type === "all" || type === "commodities") results.push(...COMMODITIES.map(s => ({ ...s, assetType: "commodity" })));
-  if (type === "all" || type === "indexes") results.push(...INDEXES.map(s => ({ ...s, assetType: "index" })));
-  if (type === "all" || type === "crypto") results.push(...CRYPTO.map(s => ({ ...s, assetType: "crypto" })));
+  if (type === "all" || type === "stocks") results.push(...NIFTY_50_STOCKS.map(s => ({ ...s, assetType: "stock", currency: "INR" })));
+  if (type === "all" || type === "us_stocks") results.push(...US_STOCKS.map(s => ({ ...s, assetType: "us_stock" })));
+  if (type === "all" || type === "etfs") results.push(...ETFS.map(s => ({ ...s, assetType: "etf", currency: "INR" })));
+  if (type === "all" || type === "mfs") results.push(...MUTUAL_FUNDS.map(s => ({ ...s, assetType: "mutual_fund", currency: "INR" })));
+  if (type === "all" || type === "commodities") results.push(...COMMODITIES.map(s => ({ ...s, assetType: "commodity", currency: "USD" })));
+  if (type === "all" || type === "indexes") results.push(...INDEXES.map(s => ({ ...s, assetType: "index", currency: "INR" })));
+  if (type === "all" || type === "crypto") results.push(...CRYPTO.map(s => ({ ...s, assetType: "crypto", currency: "USD" })));
 
   const query = searchParams.get("q")?.toLowerCase() || "";
   
@@ -220,5 +253,5 @@ export async function GET(request: Request) {
     );
   }
 
-  return NextResponse.json(results.slice(0, 50));
+  return NextResponse.json(results);
 }

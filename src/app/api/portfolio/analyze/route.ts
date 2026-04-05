@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { getHistoricalPrices, getCurrentPrice } from "@/lib/data/market-data";
+import { getHistoricalPrices, isUSStock } from "@/lib/data/market-data";
+import { computePortfolioRiskFromChart, computeCorrelationMatrix } from "@/lib/analytics/risk-metrics";
 
-// Fallback prices if API fails
+// Last-resort fallback prices (Apr 2025 approximations)
 const FALLBACK_PRICES: Record<string, number> = {
-  "RELIANCE.NS": 2950, "TCS.NS": 4200, "HDFCBANK.NS": 1680, "INFY.NS": 1900,
-  "ICICIBANK.NS": 1200, "SBIN.NS": 820, "HINDUNILVR.NS": 2850, "ITC.NS": 450,
-  "KOTAKBANK.NS": 1850, "BHARTIARTL.NS": 1580, "NIFTYBEES.NS": 250, "GOLDBEES.NS": 58,
-  "BTC-USD": 95000, "ETH-USD": 3200, "GC=F": 2750, "SI=F": 32,
+  "RELIANCE.NS": 1270,  "TCS.NS": 3750,    "HDFCBANK.NS": 1880,  "INFY.NS": 1800,
+  "ICICIBANK.NS": 1380, "SBIN.NS": 800,    "HINDUNILVR.NS": 2380,"ITC.NS": 430,
+  "KOTAKBANK.NS": 2100, "BHARTIARTL.NS": 1750,"AXISBANK.NS": 1190,"BAJFINANCE.NS": 8600,
+  "BAJAJFINSV.NS":1950, "WIPRO.NS": 260,   "TATAMOTORS.NS": 700, "MARUTI.NS": 12100,
+  "HCLTECH.NS": 1760,   "TECHM.NS": 1520,  "ZOMATO.NS": 230,     "ADANIPORTS.NS": 1380,
+  "SUNPHARMA.NS": 1860, "TITAN.NS": 3680,  "ASIANPAINT.NS": 2300,"NESTLEIND.NS": 24000,
+  "LTIM.NS": 5200,      "NTPC.NS": 380,    "ONGC.NS": 260,       "COALINDIA.NS": 480,
+  "NIFTYBEES.NS": 255,  "GOLDBEES.NS": 64, "SILVERBEES.NS": 96,
+  "BTC-USD": 83000,     "ETH-USD": 1800,   "GC=F": 3050,         "SI=F": 34,
+  "CL=F": 72,           "NG=F": 2.0,
 };
 
 interface AssetInput {
@@ -24,6 +31,7 @@ export async function POST(request: Request) {
       recurringAmount: number;
       frequency: string | null;
       startDate: string;
+      benchmarks?: string[];
     };
 
     if (!assets || assets.length === 0) {
@@ -37,16 +45,15 @@ export async function POST(request: Request) {
     const totalRecurring = (recurringAmount || 0) * months;
     const totalInvested = initialInvestment + totalRecurring;
 
-    // Fetch historical and current prices in parallel for all assets
+    // Fetch historical prices for all assets in parallel
     const dataPromises = assets.map(async (asset) => {
-      const [histPrices, quote] = await Promise.all([
-        getHistoricalPrices(asset.symbol, startDate),
-        getCurrentPrice(asset.symbol),
-      ]);
+      const histPrices = await getHistoricalPrices(asset.symbol, startDate);
+      // Use last historical close as current price — avoids a redundant API call
+      const lastPrice = histPrices.length > 0 ? histPrices[histPrices.length - 1].close : null;
       return {
         symbol: asset.symbol,
         histPrices,
-        currentPrice: quote?.price ?? FALLBACK_PRICES[asset.symbol] ?? 100,
+        currentPrice: lastPrice ?? FALLBACK_PRICES[asset.symbol] ?? 100,
       };
     });
 
@@ -63,10 +70,16 @@ export async function POST(request: Request) {
       investedAmount: number;
       returnAmount: number;
       returnPercent: number;
+      currency?: string;
+      currentPriceUSD?: number;
+      avgBuyPriceUSD?: number;
+      currentValueUSD?: number;
     }
 
     const holdings: HoldingResult[] = [];
     const allChartData: Array<{ date: string; value: number; invested: number }> = [];
+    const allLumpSumData: Array<{ date: string; value: number; invested: number }> = [];
+    const assetChartDataMap: Map<string, Array<{ date: string; value: number; invested: number }>> = new Map();
 
     for (const asset of assets) {
       const data = dataMap.get(asset.symbol);
@@ -130,6 +143,13 @@ export async function POST(request: Request) {
       const returnAmount = currentValue - totalAssetInvested;
       const returnPercent = totalAssetInvested > 0 ? (returnAmount / totalAssetInvested) * 100 : 0;
 
+      // USD values for US stocks (prices are already converted to INR in market-data.ts)
+      const lastPricePoint = histPrices.length > 0 ? histPrices[histPrices.length - 1] : null;
+      const currentPriceUSD = lastPricePoint?.closeUSD;
+      const usdInrRate = currentPriceUSD && currentPriceUSD > 0
+        ? currentPrice / currentPriceUSD
+        : undefined;
+
       holdings.push({
         symbol: asset.symbol,
         name: asset.name,
@@ -140,15 +160,24 @@ export async function POST(request: Request) {
         investedAmount: Math.round(totalAssetInvested),
         returnAmount: Math.round(returnAmount),
         returnPercent: Math.round(returnPercent * 100) / 100,
+        ...(isUSStock(asset.symbol) && currentPriceUSD && usdInrRate ? {
+          currency: "USD",
+          currentPriceUSD: Math.round(currentPriceUSD * 100) / 100,
+          avgBuyPriceUSD:  Math.round((avgBuyPrice / usdInrRate) * 100) / 100,
+          currentValueUSD: Math.round(currentValue / usdInrRate),
+        } : { currency: "INR" }),
       });
 
       // Build accurate chart data
+      const assetPoints: Array<{ date: string; value: number; invested: number }> = [];
       if (histPrices.length > 0) {
         // Track cumulative invested and units for accurate chart
         let cumulativeUnits = initialInvested / histPrices[0].close;
         let cumulativeInvested = initialInvested;
         let lastChartMonth = -1;
         const monthlyDCA = recurringAmount * normalizedWeight;
+        // Lump sum: all invested on day 1
+        const lsUnits = totalAssetInvested / histPrices[0].close;
 
         for (const price of histPrices) {
           const d = new Date(price.date);
@@ -163,10 +192,17 @@ export async function POST(request: Request) {
           }
           lastChartMonth = monthKey;
 
-          allChartData.push({
+          const pt = {
             date: price.date,
             value: Math.round(cumulativeUnits * price.close),
             invested: Math.round(cumulativeInvested),
+          };
+          allChartData.push(pt);
+          assetPoints.push(pt);
+          allLumpSumData.push({
+            date: price.date,
+            value: Math.round(lsUnits * price.close),
+            invested: Math.round(totalAssetInvested),
           });
         }
       } else {
@@ -177,13 +213,17 @@ export async function POST(request: Request) {
           const date = new Date(start);
           date.setMonth(date.getMonth() + m);
           const price = estimatedStartPrice * Math.pow(monthlyGrowth, m);
-          allChartData.push({
+          const pt = {
             date: date.toISOString().split("T")[0],
             value: Math.round(quantity * price),
             invested: Math.round(initialInvested + (recurringInvested * m / months)),
-          });
+          };
+          allChartData.push(pt);
+          assetPoints.push(pt);
+          allLumpSumData.push({ ...pt, invested: Math.round(totalAssetInvested) });
         }
       }
+      assetChartDataMap.set(asset.symbol, assetPoints);
     }
 
     // Aggregate chart data by date for multi-asset portfolios
@@ -202,23 +242,103 @@ export async function POST(request: Request) {
       .map(([date, d]) => ({ date, value: d.value, invested: d.invested }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Aggregate lump-sum data
+    const lsMap = new Map<string, { value: number; invested: number }>();
+    for (const pt of allLumpSumData) {
+      const ex = lsMap.get(pt.date);
+      if (ex) { ex.value += pt.value; ex.invested += pt.invested; }
+      else lsMap.set(pt.date, { value: pt.value, invested: pt.invested });
+    }
+    const lsChartData = Array.from(lsMap.entries())
+      .map(([date, d]) => ({ date, value: d.value, invested: d.invested }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     const totalCurrentValue = holdings.reduce((sum, h) => sum + h.currentValue, 0);
     const absoluteReturn = totalCurrentValue - totalInvested;
     const percentReturn = totalInvested > 0 ? (absoluteReturn / totalInvested) * 100 : 0;
     const cagr = totalInvested > 0 ? (Math.pow(totalCurrentValue / totalInvested, 1 / years) - 1) * 100 : 0;
 
     const sortedHoldings = [...holdings].sort((a, b) => b.returnPercent - a.returnPercent);
+    const roundedCagr = Math.round(cagr * 100) / 100;
+
+    // Risk metrics + drawdown series from aggregated chart data
+    const { metrics: riskMetrics, drawdownSeries } = computePortfolioRiskFromChart(chartData, roundedCagr);
+
+    // Lump sum comparison
+    const lsCurrentValue = lsChartData[lsChartData.length - 1]?.value ?? totalCurrentValue;
+    const lsReturn = totalInvested > 0 ? ((lsCurrentValue - totalInvested) / totalInvested) * 100 : 0;
+    const lsCagr = totalInvested > 0 && years > 0 ? (Math.pow(lsCurrentValue / totalInvested, 1 / years) - 1) * 100 : 0;
+    const lumpSumComparison = {
+      currentValue: Math.round(lsCurrentValue),
+      cagr: Math.round(lsCagr * 100) / 100,
+      percentReturn: Math.round(lsReturn * 100) / 100,
+      chartData: lsChartData,
+    };
+
+    // Per-asset chart data (for correlation)
+    const assetChartData: Record<string, Array<{ date: string; value: number; invested: number }>> = {};
+    for (const [sym, pts] of assetChartDataMap.entries()) assetChartData[sym] = pts;
+
+    // Correlation matrix (if 2+ assets)
+    let correlationMatrix: number[][] = [];
+    let correlationSymbols: string[] = [];
+    if (assets.length >= 2) {
+      const result = computeCorrelationMatrix(assetChartData);
+      correlationMatrix = result.matrix;
+      correlationSymbols = result.symbols;
+    }
+
+    // Benchmarks
+    let benchmarks: Record<string, Array<{ date: string; value: number; invested: number }>> = {};
+    try {
+      const firstDate = chartData[0]?.date ?? startDate;
+      const lastDate = chartData[chartData.length - 1]?.date;
+      const normBase = chartData[0]?.value ?? totalInvested;
+
+      // Nifty 50
+      const niftyPrices = await getHistoricalPrices("^NSEI", firstDate);
+      if (niftyPrices.length > 1) {
+        const niftyStart = niftyPrices[0].close;
+        benchmarks.nifty = niftyPrices
+          .filter(p => !lastDate || p.date <= lastDate)
+          .map(p => ({ date: p.date, value: Math.round(normBase * (p.close / niftyStart)), invested: normBase }));
+      }
+
+      // Gold (GC=F)
+      const goldPrices = await getHistoricalPrices("GC=F", firstDate);
+      if (goldPrices.length > 1) {
+        const goldStart = goldPrices[0].close;
+        benchmarks.gold = goldPrices
+          .filter(p => !lastDate || p.date <= lastDate)
+          .map(p => ({ date: p.date, value: Math.round(normBase * (p.close / goldStart)), invested: normBase }));
+      }
+
+      // FD at 6.5% compounded annually
+      benchmarks.fd = chartData.map(pt => {
+        const t = (new Date(pt.date).getTime() - new Date(firstDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
+        return { date: pt.date, value: Math.round(normBase * Math.pow(1.065, t)), invested: normBase };
+      });
+    } catch {
+      // Benchmarks are non-critical, skip on error
+    }
 
     return NextResponse.json({
       totalInvested: Math.round(totalInvested),
       currentValue: Math.round(totalCurrentValue),
       absoluteReturn: Math.round(absoluteReturn),
       percentReturn: Math.round(percentReturn * 100) / 100,
-      cagr: Math.round(cagr * 100) / 100,
+      cagr: roundedCagr,
       holdings,
       chartData,
+      assetChartData,
       bestPerformer: { symbol: sortedHoldings[0]?.symbol ?? "", returnPercent: sortedHoldings[0]?.returnPercent ?? 0 },
       worstPerformer: { symbol: sortedHoldings[sortedHoldings.length - 1]?.symbol ?? "", returnPercent: sortedHoldings[sortedHoldings.length - 1]?.returnPercent ?? 0 },
+      riskMetrics,
+      drawdownSeries,
+      lumpSumComparison,
+      benchmarks,
+      correlationMatrix,
+      correlationSymbols,
       dataSource: "yahoo-finance2 + AMFI",
     });
   } catch (error) {

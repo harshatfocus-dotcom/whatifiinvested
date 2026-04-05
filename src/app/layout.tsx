@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-inter"
+});
 
 export const metadata: Metadata = {
   title: "WhatIfIInvested - Stop Wondering, Start Investing",
@@ -12,8 +18,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-full flex flex-col bg-background-primary">
+    <html lang="en">
+      <body className={`min-h-full flex flex-col font-sans ${inter.variable}`} style={{ background: "#F5F5F7", color: "#1D1D1F", fontVariantNumeric: "tabular-nums" }}>
         {children}
       </body>
     </html>

@@ -28,10 +28,20 @@ const config: Config = {
           DEFAULT: "#2A2A3A",
           grid: "#1F1F2E",
         },
+        zen: {
+          bg: "#0C0C0D",
+          purpleLight: "#B9A9FB",
+          lime: "#E5F788",
+          purpleDark: "#895AF7",
+          mint: "#88F7C6",
+          lavender: "#D9C1FF",
+          cyan: "#B8F4FF",
+        }
       },
       fontFamily: {
         sora: ["Sora", "sans-serif"],
         dm: ["DM Sans", "sans-serif"],
+        poppins: ["var(--font-poppins)", "sans-serif"],
       },
       animation: {
         "fade-in": "fadeIn 0.5s ease-out forwards",
@@ -39,6 +49,7 @@ const config: Config = {
         "scale-in": "scaleIn 0.3s ease-out forwards",
         "pulse-glow": "pulseGlow 2s ease-in-out infinite",
         "count-up": "countUp 1s ease-out forwards",
+        "float": "float 6s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -61,6 +72,10 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        }
       },
     },
   },

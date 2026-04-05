@@ -70,7 +70,7 @@ Strategy Signals: ${strategies?.map((s) => `${s.strategy}: ${s.signal}`).join(",
     if (GEMINI_API_KEY) {
       try {
         const geminiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -105,7 +105,7 @@ Strategy Signals: ${strategies?.map((s) => `${s.strategy}: ${s.signal}`).join(",
               Authorization: `Bearer ${OPENROUTER_API_KEY}`,
             },
             body: JSON.stringify({
-              model: "google/gemini-2.0-flash-exp:free",
+              model: "qwen/qwen3.6-plus:free",
               messages: [
                 { role: "system", content: SYSTEM_PROMPT },
                 { role: "user", content: userMessage },
