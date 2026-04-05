@@ -7,6 +7,7 @@ import { PerformanceChart } from "@/components/charts/performance-chart";
 import { DrawdownChart } from "@/components/charts/drawdown-chart";
 import { MonteCarloProjections } from "@/components/charts/monte-carlo-projections";
 import { CorrelationHeatmap } from "@/components/charts/correlation-heatmap";
+import { CustomMonthPicker } from "@/components/ui/custom-month-picker";
 import type { Asset, PortfolioAnalysis } from "@/types";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -1108,21 +1109,14 @@ export default function BacktestPage() {
           </div>
 
           {/* Start Date */}
-          <div style={{ borderBottom: `1px solid rgba(0,0,0,0.05)`, padding: "10px 0" }}>
-            <p style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
+          <div style={{ padding: "4px 0" }}>
+            <p style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, paddingLeft: 4 }}>
               Start Date
             </p>
-            <input
-              type="month"
+            <CustomMonthPicker
               value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 7)}
-              style={{
-                background: "transparent", border: "none", outline: "none",
-                color: C.text, fontSize: 18, fontWeight: 700,
-                width: "100%", fontFamily: "inherit", cursor: "pointer",
-                colorScheme: "light",
-              }}
+              onChange={setStartDate}
+              maxDate={new Date().toISOString().slice(0, 7)}
             />
           </div>
 
