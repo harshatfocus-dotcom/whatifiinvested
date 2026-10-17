@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Area, ComposedChart, ReferenceDot, ReferenceLine,
+  ResponsiveContainer, Area, ComposedChart, ReferenceDot, ReferenceLine, Brush
 } from "recharts";
 import type { ChartDataPoint, SignalPoint, BenchmarkData } from "@/types";
 
@@ -28,6 +28,7 @@ interface PerformanceChartProps {
   benchmarks?: BenchmarkData;
   activeBenchmarks?: Set<string>;
   inflationAdjusted?: boolean;
+  isDark?: boolean;
 }
 
 interface TooltipPayloadItem {
@@ -49,6 +50,7 @@ export function PerformanceChart({
   benchmarks,
   activeBenchmarks = new Set(),
   inflationAdjusted = false,
+  isDark = false,
 }: PerformanceChartProps) {
   const [timeRange, setTimeRange] = useState<string>("ALL");
   const [hoveredSignal, setHoveredSignal] = useState<SignalPoint | null>(null);
@@ -141,7 +143,7 @@ export function PerformanceChart({
         color: "#FFFFFF",
       }}>
         <p style={{ color: "#A1A1A6", fontSize: 11, marginBottom: 6, fontWeight: 500 }}>{formatDate(label ?? "")}</p>
-        <p style={{ color: "#8E8CE6", fontWeight: 700, fontSize: 15, marginBottom: 3 }}>
+        <p style={{ color: "#2962FF", fontWeight: 700, fontSize: 15, marginBottom: 3 }}>
           {formatValue(dp?.value || 0)}{inflationAdjusted ? " (real)" : ""}
         </p>
         <p style={{ color: "#A1A1A6", fontSize: 12 }}>Invested: {formatValue(dp?.invested || 0)}</p>
@@ -173,7 +175,7 @@ export function PerformanceChart({
             {symbol}
           </p>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <span style={{ color: "#1D1D1F", fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>
+            <span style={{ color: isDark ? "#E8EAED" : "#1D1D1F", fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>
               {formatValue(lastVal)}
             </span>
             <span style={{ color: isPositive ? "#34C759" : "#FF3B30", fontSize: 14, fontWeight: 700 }}>
@@ -183,15 +185,15 @@ export function PerformanceChart({
         </div>
 
         {/* Time range */}
-        <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 12, padding: 3 }}>
+        <div style={{ display: "flex", gap: 2, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`, borderRadius: 12, padding: 3 }}>
           {["1M", "6M", "1Y", "3Y", "ALL"].map(r => (
             <button key={r} onClick={() => setTimeRange(r)} style={{
               padding: "5px 11px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: timeRange === r ? "#FFFFFF" : "transparent",
-              color: timeRange === r ? "#5E5CE6" : "#AEAEB2",
+              background: timeRange === r ? (isDark ? "#26303F" : "#FFFFFF") : "transparent",
+              color: timeRange === r ? "#2962FF" : "#AEAEB2",
               fontSize: 12, fontWeight: timeRange === r ? 700 : 500,
               fontFamily: "inherit", transition: "all 0.15s",
-              boxShadow: timeRange === r ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              boxShadow: timeRange === r ? (isDark ? "0 1px 3px rgba(0,0,0,0.4)" : "0 1px 3px rgba(0,0,0,0.1)") : "none",
             }}>
               {r}
             </button>
@@ -231,12 +233,12 @@ export function PerformanceChart({
           <ComposedChart data={chartDataWithBenchmarks} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="perfPortfolioGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#5E5CE6" stopOpacity={0.18} />
-                <stop offset="100%" stopColor="#5E5CE6" stopOpacity={0} />
+                <stop offset="0%" stopColor="#2962FF" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#2962FF" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="perfInvestedGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.08} />
-                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
+                <stop offset="0%" stopColor="#555A68" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="#555A68" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.03)" vertical={false} />
@@ -277,14 +279,14 @@ export function PerformanceChart({
 
             <Area
               type="basis" dataKey="value"
-              stroke="#5E5CE6" strokeWidth={2.5}
+              stroke="#2962FF" strokeWidth={2.5}
               fillOpacity={1} fill="url(#perfPortfolioGrad)"
               dot={false}
-              activeDot={{ r: 5, fill: "#5E5CE6", stroke: "rgba(94,92,230,0.25)", strokeWidth: 3 }}
+              activeDot={{ r: 5, fill: "#2962FF", stroke: "rgba(41,98,255,0.25)", strokeWidth: 3 }}
             />
             <Area
               type="basis" dataKey="invested"
-              stroke="#8B5CF6" strokeWidth={1.5} strokeDasharray="4 4"
+              stroke="#555A68" strokeWidth={1.5} strokeDasharray="4 4"
               fillOpacity={1} fill="url(#perfInvestedGrad)"
               dot={false}
             />
@@ -317,6 +319,20 @@ export function PerformanceChart({
                 style={{ cursor: "pointer" }}
               />
             ))}
+
+            <Brush
+              dataKey="date"
+              height={32}
+              stroke={isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"}
+              fill={isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)"}
+              travellerWidth={10}
+              startIndex={0}
+              style={{ borderRadius: 8 }}
+              tickFormatter={(v: string) => {
+                const d = new Date(v);
+                return `${d.toLocaleString("default", { month: "short" })} '${d.getFullYear().toString().slice(2)}`;
+              }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -349,23 +365,23 @@ export function PerformanceChart({
       {/* Legend */}
       <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 14, height: 3, background: "#5E5CE6", borderRadius: 2 }} />
-          <span style={{ color: "#6E6E73", fontSize: 11, fontWeight: 500 }}>Portfolio Value</span>
+          <div style={{ width: 14, height: 3, background: "#2962FF", borderRadius: 2 }} />
+          <span style={{ color: isDark ? "#787B86" : "#6E6E73", fontSize: 11, fontWeight: 500 }}>Portfolio Value</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 14, height: 0, border: "1.5px dashed #8B5CF6", borderRadius: 2 }} />
-          <span style={{ color: "#6E6E73", fontSize: 11, fontWeight: 500 }}>Total Invested</span>
+          <div style={{ width: 14, height: 0, border: `1.5px dashed ${isDark ? "#555A68" : "#9CA3AF"}`, borderRadius: 2 }} />
+          <span style={{ color: isDark ? "#787B86" : "#6E6E73", fontSize: 11, fontWeight: 500 }}>Total Invested</span>
         </div>
         {visibleSignals.some(s => s.type === "entry") && (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34C759" }} />
-            <span style={{ color: "#6E6E73", fontSize: 11, fontWeight: 500 }}>Entry</span>
+            <span style={{ color: isDark ? "#787B86" : "#6E6E73", fontSize: 11, fontWeight: 500 }}>Entry</span>
           </div>
         )}
         {visibleSignals.some(s => s.type === "exit") && (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#FF3B30" }} />
-            <span style={{ color: "#6E6E73", fontSize: 11, fontWeight: 500 }}>Exit</span>
+            <span style={{ color: isDark ? "#787B86" : "#6E6E73", fontSize: 11, fontWeight: 500 }}>Exit</span>
           </div>
         )}
       </div>

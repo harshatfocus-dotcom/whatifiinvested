@@ -2,28 +2,40 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, RefreshCw, Check, TrendingUp, Info, Download } from "lucide-react";
+import { Search, X, RefreshCw, Check, TrendingUp, Info, Download, PanelLeft, ExternalLink, MessageCircle, ChevronDown, Send, Sun, Moon, Sparkles, Calendar, Lightbulb, AlertTriangle } from "lucide-react";
 import { PerformanceChart } from "@/components/charts/performance-chart";
 import { DrawdownChart } from "@/components/charts/drawdown-chart";
 import { MonteCarloProjections } from "@/components/charts/monte-carlo-projections";
 import { CorrelationHeatmap } from "@/components/charts/correlation-heatmap";
 import { CustomMonthPicker } from "@/components/ui/custom-month-picker";
+import { ChatInterface } from "@/components/chat/chat-interface";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import type { Asset, PortfolioAnalysis } from "@/types";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 
-const C = {
-  bg: "#F7F7F9",
-  surface: "#FFFFFF",
-  border: "rgba(0,0,0,0.05)",
-  text: "#1D1D1F",
-  textSub: "#6E6E73",
-  muted: "#A1A1A6",
-  accent: "#5E5CE6",
-  green: "#00C853",
-  red: "#FF3B30",
-  amber: "#FF9F0A",
-};
+function makeColors(dark: boolean) {
+  return {
+    // TradingView/Cursor-inspired palette — pure greys, no purple tint in dark mode
+    bg: dark ? "#131722" : "#F0F3FA",
+    surface: dark ? "#1E222D" : "#FFFFFF",
+    surfaceHigh: dark ? "#26303F" : "#F8FAFC",
+    border: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.10)",
+    text: dark ? "#D1D4DC" : "#131722",
+    textSub: dark ? "#787B86" : "#4B5563",
+    muted: dark ? "#555A68" : "#9CA3AF",
+    accent: "#2962FF",
+    accentLight: dark ? "rgba(41,98,255,0.14)" : "#EEF2FF",
+    green: dark ? "#26A69A" : "#089981",
+    greenLight: dark ? "rgba(38,166,154,0.14)" : "#E6FAF7",
+    red: dark ? "#EF5350" : "#D32F2F",
+    redLight: dark ? "rgba(239,83,80,0.14)" : "#FEF2F2",
+    amber: dark ? "#F59E0B" : "#B45309",
+  };
+}
+
+// Will be replaced by component-level usage
+const C = makeColors(false);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,87 +84,86 @@ const ALL_STRATEGIES = [
 ];
 
 const HISTORICAL_PRESETS = [
-  {
-    id: "covid_crash",
-    label: "COVID Crash",
-    icon: "📉",
-    date: "2020-01",
-    story: "What if you bought India's biggest names at the COVID bottom?",
-    color: "#FF3B30",
-    assets: [
-      { symbol: "RELIANCE.NS", name: "Reliance Industries" },
-      { symbol: "HDFCBANK.NS", name: "HDFC Bank" },
-      { symbol: "INFY.NS", name: "Infosys" },
-    ],
-  },
-  {
-    id: "crypto_bull",
-    label: "Crypto Bull Run",
-    icon: "🚀",
-    date: "2020-10",
-    story: "Riding the 2020–21 crypto bull run from near the bottom.",
-    color: "#F7931A",
-    assets: [
-      { symbol: "BTC-USD", name: "Bitcoin" },
-      { symbol: "ETH-USD", name: "Ethereum" },
-    ],
-  },
-  {
-    id: "it_supercycle",
-    label: "IT Supercycle",
-    icon: "💻",
-    date: "2020-04",
-    story: "The pandemic supercharged India's IT sector.",
-    color: "#34C759",
-    assets: [
-      { symbol: "TCS.NS", name: "TCS" },
-      { symbol: "INFY.NS", name: "Infosys" },
-      { symbol: "HCLTECH.NS", name: "HCL Technologies" },
-    ],
-  },
-  {
-    id: "gold_safety",
-    label: "Gold Safe Haven",
-    icon: "🥇",
-    date: "2019-01",
-    story: "Gold's historic run during market uncertainty.",
-    color: "#B8860B",
-    assets: [
-      { symbol: "GC=F", name: "Gold Futures" },
-      { symbol: "GOLDBEES.NS", name: "Nippon Gold BeES" },
-    ],
-  },
-  {
-    id: "jio_revolution",
-    label: "Jio Revolution",
-    icon: "📡",
-    date: "2018-01",
-    story: "Bharti Airtel + Reliance — the telecom disruption play.",
-    color: "#5E5CE6",
-    assets: [
-      { symbol: "BHARTIARTL.NS", name: "Bharti Airtel" },
-      { symbol: "RELIANCE.NS", name: "Reliance Industries" },
-    ],
-  },
-  {
-    id: "nifty_sip",
-    label: "Nifty 50 SIP",
-    icon: "📈",
-    date: "2019-01",
-    story: "The power of consistent monthly SIP in a Nifty index ETF.",
-    color: "#5E5CE6",
-    assets: [
-      { symbol: "NIFTYBEES.NS", name: "Nippon Nifty BeES" },
-    ],
-  },
+  { id:"covid_crash", label:"COVID Crash & Recovery", icon:"��", date:"2020-03", endDate:"2021-10", color:"#EF4444",
+    story:"In March 2020, WHO declared COVID-19 a pandemic. Nifty 50 plunged 38% in 6 weeks. Markets bottomed on March 23, 2020. RBI cut rates to 4% and the government unleashed massive stimulus. What followed was the sharpest V-shaped recovery in Indian market history. Investors who bought blue-chips at the crash saw 2-3x returns by late 2021.",
+    assets:[{symbol:"RELIANCE.NS",name:"Reliance Industries"},{symbol:"HDFCBANK.NS",name:"HDFC Bank"},{symbol:"INFY.NS",name:"Infosys"}]},
+  { id:"crypto_bull", label:"Crypto Bull Run 2020-21", icon:"🚀", date:"2020-10", endDate:"2021-11", color:"#F7931A",
+    story:"PayPal announced crypto support in October 2020, triggering the first institutional bull run. Bitcoin surged from $11K to $64K by April 2021 — a 5.7x gain. Ethereum flew from $380 to $4,800 driven by DeFi and NFTs. Tesla bought $1.5B in BTC. China banned mining in May 2021 and the cycle peaked in November.",
+    assets:[{symbol:"BTC-USD",name:"Bitcoin"},{symbol:"ETH-USD",name:"Ethereum"}]},
+  { id:"global_financial_crisis", label:"2008 Financial Crisis", icon:"🏛️", date:"2008-01", endDate:"2013-12", color:"#6366F1",
+    story:"Lehman Brothers collapsed September 15 2008 — largest US bankruptcy ever. Nifty 50 crashed 63% from 21,206 to 7,697 by Oct 2008. FIIs pulled Rs 52,000 cr from India. But gold surged 25% in INR that year. A 50/50 Nifty-Gold portfolio fell only 35% vs 63% for pure equity. Full Nifty recovery took until December 2013 — 5.5 years.",
+    assets:[{symbol:"^NSEI",name:"Nifty 50"},{symbol:"GC=F",name:"Gold"}]},
+  { id:"it_supercycle", label:"India IT Supercycle", icon:"💻", date:"2020-04", endDate:"2022-01", color:"#10B981",
+    story:"COVID forced the world digital overnight. US tech companies outsourced at record pace — TCS and Infosys had more deals than they could handle. TCS added $8B revenue in 18 months. Infosys raised guidance five consecutive quarters. TCS surged 130%, Infosys 110%, HCLTech 90% from April 2020 to January 2022.",
+    assets:[{symbol:"TCS.NS",name:"TCS"},{symbol:"INFY.NS",name:"Infosys"},{symbol:"HCLTECH.NS",name:"HCL Technologies"}]},
+  { id:"gold_safety", label:"Gold Safe Haven 2019-20", icon:"🥇", date:"2019-01", endDate:"2020-12", color:"#D97706",
+    story:"US-China trade war, Brexit, and Iran tensions drove central banks to buy record amounts of gold. INR fell 6% vs USD, amplifying gains for Indian investors. Gold in INR went from Rs 31,000/10g in Jan 2019 to Rs 56,000/10g by Aug 2020 — an 80% gain in under 2 years. RBI itself added 50+ tonnes to reserves.",
+    assets:[{symbol:"GC=F",name:"Gold Futures"},{symbol:"GOLDBEES.NS",name:"Nippon Gold BeES"}]},
+  { id:"jio_revolution", label:"Airtel Comeback + Jio Empire", icon:"📡", date:"2018-01", endDate:"2024-01", color:"#2962FF",
+    story:"Jio's 2016 launch destroyed telecom margins and by 2018 everyone expected Airtel to collapse under Rs 1.16L cr debt. Instead Airtel raised tariffs in 2019, doubled revenue-per-user and shed low-value subscribers. Airtel went from Rs 280 to Rs 1,200+ — a 4x return. Reliance Jio became a digital empire worth over $100B.",
+    assets:[{symbol:"BHARTIARTL.NS",name:"Bharti Airtel"},{symbol:"RELIANCE.NS",name:"Reliance Industries"}]},
+  { id:"nifty_sip", label:"Nifty 50 SIP — 5 Years", icon:"📈", date:"2019-01", endDate:"2024-01", color:"#2962FF",
+    story:"Invest a fixed amount monthly in Nifty 50, no matter what. From Jan 2019 to Jan 2024, a Rs 10,000/month SIP — total Rs 6L — grew to approximately Rs 10-11L, delivering ~14% IRR. No stock picking. No timing. Just consistency. COVID, rate hikes, geopolitical chaos — the SIP absorbed it all and came out ahead.",
+    assets:[{symbol:"NIFTYBEES.NS",name:"Nippon Nifty BeES"}]},
+  { id:"nvidia_ai", label:"Nvidia AI Supernova", icon:"🧠", date:"2022-10", endDate:"2024-06", color:"#10B981",
+    story:"ChatGPT launched November 2022 and the world scrambled for GPUs. Nvidia owned 80%+ of the AI training chip market with no alternative at scale. Revenue grew from $6B to $26B in one year. Stock went from $108 in Oct 2022 to $1,200 in June 2024 — an 11x gain in 20 months. Possibly the fastest large-cap value creation in stock market history.",
+    assets:[{symbol:"NVDA",name:"Nvidia"}]},
+  { id:"magnificent_seven", label:"Magnificent Seven Rally", icon:"💎", date:"2022-12", endDate:"2024-06", color:"#6366F1",
+    story:"When the 2022 rate-hike bear market ended, 7 mega-cap tech giants led an extraordinary rally. Apple crossed $3T market cap. Microsoft Azure AI drove enterprise deals. Meta rebounded 300%+ after its cost-cutting. S&P 500 gained ~50% but most gains came from just 7 stocks — a landmark study in concentration risk and reward.",
+    assets:[{symbol:"AAPL",name:"Apple"},{symbol:"MSFT",name:"Microsoft"},{symbol:"NVDA",name:"Nvidia"}]},
+  { id:"meta_crash", label:"Meta Metaverse Meltdown", icon:"📉", date:"2021-09", endDate:"2022-11", color:"#EC4899",
+    story:"In Q4 2021 Zuckerberg renamed Facebook to Meta and pledged $10B+/year on Reality Labs. Simultaneously Apple iOS changes hit ad revenue by $10B/year. Meta fell from $380 to $88 — a 77% crash erasing $700B in market cap. The largest single-company value destruction in history. A textbook lesson that narrative without profits destroys shareholder value.",
+    assets:[{symbol:"META",name:"Meta Platforms"}]},
+  { id:"zomato_recovery", label:"Zomato's Business Turnaround", icon:"🍔", date:"2022-07", endDate:"2024-06", color:"#EF4444",
+    story:"Zomato listed in July 2021 at Rs 76 then crashed to Rs 40 in 2022. Deepinder Goyal took action: shut Zomato Instant, cut dark stores, reduced headcount. Blinkit acquisition proved visionary. By FY24, Zomato delivered its first profit. Stock went from Rs 40 to Rs 220+ — a 5x recovery. A rare Indian new-age startup that genuinely fixed its unit economics.",
+    assets:[{symbol:"ZOMATO.NS",name:"Zomato Ltd"}]},
+  { id:"tata_motors_ev", label:"Tata Motors EV Turnaround", icon:"⚡", date:"2020-04", endDate:"2024-01", color:"#10B981",
+    story:"Tata Motors was at Rs 65 in April 2020 — nearly left for dead. JLR sales had collapsed. Then JLR's order backlog built to 200,000+ vehicles and Tata's Nexon EV dominated India with 70%+ EV market share. By Jan 2024 the stock hit Rs 780 — a 12x return in under 4 years. The most dramatic turnaround in large-cap Indian manufacturing.",
+    assets:[{symbol:"TATAMOTORS.NS",name:"Tata Motors"}]},
+  { id:"indian_banking_boom", label:"India Private Banking Boom", icon:"🏦", date:"2020-10", endDate:"2024-01", color:"#8B5CF6",
+    story:"Post-COVID credit fears evaporated. Banks had cleaned up NPAs via RBI's Asset Quality Review. ICICI Bank under Sandeep Bakshi refocused to risk-adjusted returns. NPAs hit decade lows. ICICI surged 3x, Axis Bank 2.5x, SBI 4x as India's credit growth hit a 10-year high. The entire sector re-rated from distressed to quality growth.",
+    assets:[{symbol:"ICICIBANK.NS",name:"ICICI Bank"},{symbol:"AXISBANK.NS",name:"Axis Bank"},{symbol:"SBIN.NS",name:"State Bank of India"}]},
+  { id:"crypto_winter", label:"Crypto Winter 2022", icon:"❄️", date:"2021-11", endDate:"2022-12", color:"#64748B",
+    story:"Bitcoin peaked at $69K in Nov 2021. Luna/Terra — a $40B stablecoin — collapsed to zero in May 2022. FTX imploded in November when reserves were proven fabricated. BTC fell 77%, ETH 80%, Coinbase stock 92%. A total crisis of trust proving crypto markets can collapse without consumer protection or regulation.",
+    assets:[{symbol:"BTC-USD",name:"Bitcoin"},{symbol:"ETH-USD",name:"Ethereum"},{symbol:"COIN",name:"Coinbase"}]},
+  { id:"streaming_wars", label:"The Streaming Wars", icon:"📺", date:"2019-11", endDate:"2022-12", color:"#EC4899",
+    story:"Disney+ launched November 12 2019 and hit 130M subscribers in 2 years. Netflix suddenly faced Disney, HBO Max, Peacock, and Apple TV+ simultaneously. Netflix lost subscribers for the first time in 2022 and crashed 76% from peak. Legacy TV decayed faster than streaming grew. A case study in how disruption creates chaos for both incumbents and new entrants.",
+    assets:[{symbol:"NFLX",name:"Netflix"},{symbol:"DIS",name:"Walt Disney Co"}]},
+  { id:"pandemic_tech", label:"Pandemic Stay-at-Home Stocks", icon:"🏠", date:"2020-03", endDate:"2021-08", color:"#3B82F6",
+    story:"March 2020 lockdowns created the ultimate stay-at-home tailwind. Zoom went from 10M to 300M daily participants in 3 months. Shopify merchant base doubled. Zoom surged 500%, Shopify 300%, Amazon 100% from March 2020 lows to mid-2021. But as offices reopened, Zoom fell 90% from peak — a warning about valuation during euphoria.",
+    assets:[{symbol:"ZM",name:"Zoom"},{symbol:"SHOP",name:"Shopify"},{symbol:"AMZN",name:"Amazon"}]},
+  { id:"cloud_kings", label:"Cloud Computing Era", icon:"☁️", date:"2015-01", endDate:"2021-11", color:"#0EA5E9",
+    story:"AWS went from a side project to $62B annually. Azure grew 40%+/year under Satya Nadella. Every company moved servers to cloud. Amazon 6x'd, Microsoft 7x'd, Alphabet 4x'd from 2015 to 2021 — pure fundamental growth compounding over 7 years. No speculation, just the biggest structural shift in enterprise technology.",
+    assets:[{symbol:"AMZN",name:"Amazon"},{symbol:"MSFT",name:"Microsoft"},{symbol:"GOOGL",name:"Alphabet"}]},
+  { id:"asian_paints_moat", label:"Asian Paints — The Perfect Moat", icon:"🎨", date:"2014-01", endDate:"2024-01", color:"#F43F5E",
+    story:"Asian Paints controls 55%+ of India's organized paint market with 70,000+ dealers built over 50 years — impossible for any competitor to replicate. Revenue grew from Rs 11,000 cr in 2014 to Rs 35,000 cr in 2024. Stock compounded at ~18% CAGR over a decade. Pricing power, brand, and distribution moat. Exactly what Warren Buffett calls a castle with a moat.",
+    assets:[{symbol:"ASIANPAINT.NS",name:"Asian Paints"}]},
+  { id:"paytm_ipo", label:"Paytm: IPO to Destruction", icon:"🔥", date:"2021-11", endDate:"2023-12", color:"#EF4444",
+    story:"Paytm listed November 2021 at Rs 2,150 — India's largest-ever IPO at Rs 18,300 cr. Within 2 years it fell to Rs 450 — a 79% crash. The business model confused everyone: payments, banking, or lending? None profitable. RBI banned Paytm Payments Bank in 2024 for regulatory violations. India's defining example of hype and overvaluation destroying IPO investors.",
+    assets:[{symbol:"PAYTM.NS",name:"One97 Communications"}]},
+  { id:"tesla_mania", label:"Tesla Short Squeeze 2019-21", icon:"🏎️", date:"2019-10", endDate:"2021-11", color:"#DC2626",
+    story:"Tesla was Wall Street's most shorted stock in 2019. Bears said legacy automakers would crush it. They were spectacularly wrong. Tesla delivered 500K cars in 2020, entered the S&P 500, achieved GAAP profitability, and made Elon Musk the world's richest person. Stock went from $35 (split-adjusted) to $415 — a 12x gain in 25 months.",
+    assets:[{symbol:"TSLA",name:"Tesla Inc"}]},
+  { id:"fmcg_defensive", label:"FMCG Defensive Play", icon:"🧴", date:"2018-01", endDate:"2022-12", color:"#F59E0B",
+    story:"From 2018-2022 markets faced demonetization aftermath, COVID, and rate hikes. ITC and HUL showed why consumer staples are called defensive — people buy soap and cigarettes no matter what. ITC's cigarette monopoly generated Rs 15,000 cr in annual cash flows. HUL reaches 7M+ retail outlets. Both stocks preserved capital and outperformed on a risk-adjusted basis.",
+    assets:[{symbol:"ITC.NS",name:"ITC Ltd"},{symbol:"HINDUNILVR.NS",name:"Hindustan Unilever"}]},
+  { id:"payments_duopoly", label:"Visa & Mastercard Network Moats", icon:"💳", date:"2016-01", endDate:"2021-07", color:"#F59E0B",
+    story:"Visa and Mastercard collect a toll on every transaction globally without taking credit risk. As cashless payments doubled from 2016 to 2021 and e-commerce exploded, revenues grew without extra capital. Visa 3x'd, Mastercard 3x'd. These are pure compounding machines — the definition of an asset-light business with a global network moat.",
+    assets:[{symbol:"V",name:"Visa"},{symbol:"MA",name:"Mastercard"}]},
 ];
 
+const SCENARIO_STORIES: Record<string, string> = HISTORICAL_PRESETS.reduce(
+  (acc, p) => ({ ...acc, [p.id]: p.story }),
+  {} as Record<string, string>
+);
+
 const DID_YOU_KNOW = [
-  { text: "₹1 Lakh in TCS in 2004 → over ₹1 Crore today", preset: "it_supercycle" },
-  { text: "₹1 Lakh in Bitcoin in Oct 2020 → over ₹12 Lakh just 12 months later", preset: "crypto_bull" },
-  { text: "Nifty 50 SIP of ₹10K/month since 2019 — invested ₹6L, grew to ₹12L+", preset: "nifty_sip" },
-  { text: "Gold in INR nearly doubled between 2019 and 2023, often rising when equities fell", preset: "gold_safety" },
-  { text: "₹1 Lakh in Bharti Airtel in 2018 → ₹5 Lakh+ by 2024 as Jio competition eased", preset: "jio_revolution" },
+  { text:"India IT Supercycle: TCS, Infosys and HCLTech surged 90-130% in 18 months as COVID forced digital transformation globally, triggering a massive outsourcing boom.", preset:"it_supercycle" },
+  { text:"Crypto Bull 2020-21: Bitcoin rose from $11K to $64K (+480%) and Ethereum from $380 to $4,800 (+1,163%) as institutions entered crypto for the first time at scale.", preset:"crypto_bull" },
+  { text:"2008 Crisis: Nifty 50 crashed 63% in 9 months. A 50/50 Nifty+Gold portfolio fell only 35% — showing why diversification is portfolio armour in market crashes.", preset:"global_financial_crisis" },
+  { text:"Nifty 50 SIP: Rs 10,000/month from Jan 2019 to Jan 2024 (Rs 6L total invested) grew to ~Rs 10-11L — a 14% IRR with zero stock picking or market timing required.", preset:"nifty_sip" },
+  { text:"Gold Safe Haven: Gold in INR rose 80% between Jan 2019 and Aug 2020 as the US-China trade war, COVID, and INR depreciation hit simultaneously — a perfect storm for gold.", preset:"gold_safety" },
+  { text:"Nvidia AI Supernova: From $108 in Oct 2022 to $1,200 in June 2024 — an 11x gain in 20 months — the fastest large-cap value creation triggered by the ChatGPT GPU arms race.", preset:"nvidia_ai" },
 ];
 
 const COMPANY_DOMAINS: Record<string, string> = {
@@ -226,6 +237,23 @@ const COMMODITY_ICONS: Record<string, { bg: string; text: string; label: string 
   COPPER: { bg: "#B87333", text: "#FFF3E0", label: "Cu" },
 };
 
+const COMMODITY_UNIT: Record<string, { label: string; divisor: number }> = {
+  "GC=F": { label: "/g",     divisor: 31.1035 },
+  "SI=F": { label: "/g",     divisor: 31.1035 },
+  "PL=F": { label: "/g",     divisor: 31.1035 },
+  "PA=F": { label: "/g",     divisor: 31.1035 },
+  "HG=F": { label: "/lb",    divisor: 1 },
+  "CL=F": { label: "/bbl",   divisor: 1 },
+  "NG=F": { label: "/MMBtu", divisor: 1 },
+  "ZC=F": { label: "/bu",    divisor: 1 },
+  "ZS=F": { label: "/bu",    divisor: 1 },
+  "ZW=F": { label: "/bu",    divisor: 1 },
+  "KC=F": { label: "/lb",    divisor: 1 },
+  GOLD:   { label: "/g",     divisor: 31.1035 },
+  SILVER: { label: "/g",     divisor: 31.1035 },
+  CRUDE:  { label: "/bbl",   divisor: 1 },
+};
+
 const CRYPTO_COLORS: Record<string, { bg: string; text: string }> = {
   BTC: { bg: "#F7931A", text: "#fff" },
   ETH: { bg: "#627EEA", text: "#fff" },
@@ -285,6 +313,10 @@ const STRATEGY_CHART_LABEL: Record<string, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function trimName(name: string): string {
+  return name.replace(/\s+(Ltd\.?|Limited|Pvt\.?|Inc\.?|Corp\.?|Industries|Enterprises?)$/i, "").trim();
+}
+
 function getDisplayInfo(asset: AssetItem): { ticker: string; sub: string } {
   if (asset.assetType === "mutual_fund") {
     const shortName = asset.name
@@ -307,19 +339,20 @@ function getDisplayInfo(asset: AssetItem): { ticker: string; sub: string } {
   }
   return {
     ticker: asset.symbol.replace(".NS", "").replace("-USD", ""),
-    sub: asset.name,
+    sub: trimName(asset.name),
   };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function AssetIcon({ symbol, name, type, size = 36 }: {
+function AssetIconInner({ symbol, name, type, size = 36, failed, setFailed }: {
   symbol: string;
   name: string;
   type: string;
   size?: number;
+  failed: boolean;
+  setFailed: (val: boolean) => void;
 }) {
-  const [failed, setFailed] = useState(false);
   const rawSymbol = symbol.toUpperCase();
   const cleanSymbol = symbol.replace(".NS", "").replace("-USD", "").replace(/^MF\d+$/, "").toUpperCase();
 
@@ -342,7 +375,7 @@ function AssetIcon({ symbol, name, type, size = 36 }: {
     const c = crypto || { bg: "#5E5CE6", text: "#fff" };
     return (
       <div style={{
-        width: size, height: size, borderRadius: "50%",
+        width: size, height: size, borderRadius: size * 0.28,
         background: c.bg, display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: size * 0.38, color: c.text, fontWeight: "700", flexShrink: 0,
       }}>
@@ -355,18 +388,23 @@ function AssetIcon({ symbol, name, type, size = 36 }: {
   if (symbol.includes("-USD")) fmpSymbol = symbol.replace("-USD", "USD");
   else if (symbol.endsWith("=F")) fmpSymbol = symbol.replace("=F", "");
   else if (symbol.startsWith("^")) fmpSymbol = symbol.replace("^", "");
-  
+
+  const cleanSymbolForDomain = symbol.replace(".NS", "").replace("-USD", "").replace(/^MF\d+$/, "").toUpperCase();
+  const domain = COMPANY_DOMAINS[cleanSymbolForDomain];
+  let logoUrl = `/api/assets/logo?symbol=${fmpSymbol}`;
+  if (domain) logoUrl += `&domain=${domain}`;
+
   if (!failed && type !== "commodity" && type !== "crypto") {
     return (
       <div style={{
-        width: size, height: size, borderRadius: "50%",
+        width: size, height: size, borderRadius: size * 0.28,
         background: "#ffffff", border: "1px solid rgba(0,0,0,0.06)",
         display: "flex", alignItems: "center", justifyContent: "center",
         overflow: "hidden", flexShrink: 0,
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/assets/logo?symbol=${fmpSymbol}`}
+          src={logoUrl}
           alt={name}
           width={size * 0.9}
           height={size * 0.9}
@@ -395,6 +433,42 @@ function AssetIcon({ symbol, name, type, size = 36 }: {
   );
 }
 
+function AssetIcon(props: { symbol: string; name: string; type: string; size?: number }) {
+  const [hover, setHover] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const s = props.size || 36;
+  
+  // Yahoo Finance maps accurately natively using original ticker endings
+  let yfSymbol = props.symbol;
+  if (props.symbol.endsWith("-USD")) yfSymbol = props.symbol; // Yahoo supports BTC-USD
+  
+  return (
+    <div 
+      style={{ position: "relative", display: "inline-flex", cursor: "pointer", width: s, height: s }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(`https://finance.yahoo.com/quote/${encodeURIComponent(yfSymbol)}`, '_blank');
+      }}
+      title={`View ${props.name} on Yahoo Finance`}
+    >
+      {!hover ? (
+        <AssetIconInner {...props} failed={failed} setFailed={setFailed} />
+      ) : (
+        <div style={{
+          width: s, height: s, borderRadius: s * 0.28,
+          background: "linear-gradient(135deg, #3B82F6, #6366F1)", color: "#fff", 
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 2px 8px rgba(99,102,241,0.4)", flexShrink: 0
+        }}>
+          <ExternalLink size={s * 0.5} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sparkline({ positive, seed = 1 }: { positive: boolean; seed?: number }) {
   const W = 64, H = 28;
   const points: { x: number; y: number }[] = [];
@@ -407,7 +481,7 @@ function Sparkline({ positive, seed = 1 }: { positive: boolean; seed?: number })
     points.push({ x: (i / (n - 1)) * (W - 2) + 1, y });
   }
   const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const color = positive ? "#00C853" : "#FF3B30";
+  const color = positive ? C.green : C.red;
   return (
     <svg width={W} height={H} style={{ flexShrink: 0, overflow: "visible" }}>
       <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -415,36 +489,37 @@ function Sparkline({ positive, seed = 1 }: { positive: boolean; seed?: number })
   );
 }
 
-function MetricCard({ label, value, color, tooltip }: { label: string; value: string; color: string; tooltip: string }) {
+function MetricCard({ label, value, color, tooltip, isDark = false }: { label: string; value: string; color: string; tooltip: string; isDark?: boolean }) {
   const [show, setShow] = useState(false);
+  const C = makeColors(isDark);
   return (
     <div style={{
       background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: 12, padding: "12px 14px", textAlign: "center",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.04)", position: "relative",
+      borderRadius: 12, padding: "14px 12px", textAlign: "center",
+      boxShadow: "0 1px 2px rgba(0,0,0,0.04)", position: "relative",
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 5 }}>
-        <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{label}</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 6 }}>
+        <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>{label}</p>
         <button
           onMouseEnter={() => setShow(true)}
           onMouseLeave={() => setShow(false)}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: C.muted }}
         >
-          <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 13, height: 13, borderRadius: "50%", border: `1px solid ${C.muted}`, color: C.muted }}>?</span>
+          <span style={{ fontSize: 9, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 13, height: 13, borderRadius: "50%", border: `1px solid rgba(0,0,0,0.15)`, color: C.muted }}>?</span>
         </button>
         {show && (
           <div style={{
-            position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)",
-            background: "#1A1A2E", color: "#fff", fontSize: 11, lineHeight: 1.55, fontWeight: 400,
-            padding: "9px 12px", borderRadius: 10, zIndex: 999, width: 220, textAlign: "left",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.22)", whiteSpace: "normal",
-            pointerEvents: "none",
+            position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+            background: "#1C2333", color: "#E5E7EB", fontSize: 11, lineHeight: 1.6, fontWeight: 400,
+            padding: "10px 14px", borderRadius: 10, zIndex: 999, width: 230, textAlign: "left",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.18)", whiteSpace: "normal",
+            pointerEvents: "none", border: "1px solid rgba(255,255,255,0.06)",
           }}>
             {tooltip}
           </div>
         )}
       </div>
-      <p style={{ color, fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em", margin: 0 }}>{value}</p>
+      <p style={{ color, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>{value}</p>
     </div>
   );
 }
@@ -467,13 +542,13 @@ function SIPCalculator({ formatCurrency }: { formatCurrency: (v: number) => stri
   return (
     <div style={{
       background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)",
-      borderRadius: 18, padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+      borderRadius: 14, padding: "20px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
     }}>
-      <h4 style={{ color: C.text, fontSize: 15, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.02em" }}>
+      <h4 style={{ color: C.text, fontSize: 14, fontWeight: 600, marginBottom: 4, letterSpacing: "-0.01em" }}>
         Goal-Based SIP Calculator
       </h4>
       <p style={{ color: C.muted, fontSize: 12, marginBottom: 18 }}>
-        How much do you need to invest monthly to hit your target?
+        How much do you need to invest monthly to reach your target?
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
         {[
@@ -490,23 +565,23 @@ function SIPCalculator({ formatCurrency }: { formatCurrency: (v: number) => stri
               min={f.min}
               onChange={e => f.setter(parseFloat(e.target.value) || f.min)}
               style={{
-                width: "100%", background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.08)",
-                borderRadius: 10, padding: "9px 12px", color: C.text, fontSize: 15,
-                fontWeight: 700, outline: "none", fontFamily: "inherit",
+                width: "100%", background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.09)",
+                borderRadius: 8, padding: "8px 11px", color: C.text, fontSize: 14,
+                fontWeight: 600, outline: "none", fontFamily: "inherit", fontVariantNumeric: "tabular-nums",
               }}
             />
           </div>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
         {[
-          { label: "Monthly SIP Required", value: formatCurrency(Math.round(monthlySIP)), color: C.accent, big: true },
-          { label: "Total Invested", value: formatCurrency(Math.round(totalInvested)), color: C.text, big: false },
-          { label: "Wealth Created", value: formatCurrency(Math.round(wealthCreated)), color: C.green, big: false },
+          { label: "Monthly SIP", value: formatCurrency(Math.round(monthlySIP)), color: C.accent, bg: C.accentLight },
+          { label: "Total Invested", value: formatCurrency(Math.round(totalInvested)), color: C.text, bg: "rgba(0,0,0,0.02)" },
+          { label: "Wealth Created", value: formatCurrency(Math.round(wealthCreated)), color: C.green, bg: C.greenLight },
         ].map(r => (
-          <div key={r.label} style={{ textAlign: "center", padding: "14px 10px", background: "rgba(0,0,0,0.02)", border: `1px solid ${C.border}`, borderRadius: 12 }}>
-            <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{r.label}</p>
-            <p style={{ color: r.color, fontSize: r.big ? 20 : 15, fontWeight: 800, letterSpacing: "-0.01em" }}>{r.value}</p>
+          <div key={r.label} style={{ textAlign: "center", padding: "12px 10px", background: r.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+            <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>{r.label}</p>
+            <p style={{ color: r.color, fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{r.value}</p>
           </div>
         ))}
       </div>
@@ -576,7 +651,7 @@ function StrategyMiniChart({ data, signal, strategyId }: {
   const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const areaPath = `${linePath} L${sx(values.length - 1).toFixed(1)},${(pad.t + cH).toFixed(1)} L${pad.l.toFixed(1)},${(pad.t + cH).toFixed(1)} Z`;
 
-  const lineColor = signal === "BUY" ? "#00C853" : signal === "SELL" ? "#FF3B30" : "#5E5CE6";
+  const lineColor = signal === "BUY" ? C.green : signal === "SELL" ? C.red : "#6B7280";
   const gradId = `smc-${strategyId}`;
 
   const refLines = STRATEGY_REF_LINES[strategyId] ?? [];
@@ -642,13 +717,13 @@ function StrategyMiniChart({ data, signal, strategyId }: {
 
 // ─── Card style ───────────────────────────────────────────────────────────────
 
-const card: React.CSSProperties = {
-  background: "#FFFFFF",
+const getCardStyle = (C: any): React.CSSProperties => ({
+  background: C.surface,
   border: `1px solid ${C.border}`,
-  borderRadius: "20px",
+  borderRadius: "16px",
   padding: "20px",
-  boxShadow: "0 4px 40px rgba(0,0,0,0.03)",
-};
+  boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)",
+});
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -674,13 +749,30 @@ export default function BacktestPage() {
   const [selectedDetailAsset, setSelectedDetailAsset] = useState<string>("");
   const [freqOpen, setFreqOpen] = useState(false);
   const [dykIdx, setDykIdx] = useState(0);
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+
+  // Trigger effect for scenarios auto-run
+  const [triggerRunKey, setTriggerRunKey] = useState(0);
+
+  useEffect(() => {
+    if (triggerRunKey > 0 && selectedAssets.length > 0) {
+      const tid = setTimeout(() => runSimulation(), 50);
+      return () => clearTimeout(tid);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerRunKey]);
 
   // New state
   const [activeTab, setActiveTab] = useState("overview");
   const [activeBenchmarks, setActiveBenchmarks] = useState<Set<string>>(new Set());
   const [inflationAdjusted, setInflationAdjusted] = useState(false);
-  const [isZenMode, setIsZenMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 7));
+  const [hoveredAsset, setHoveredAsset] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(false);
+  const C = makeColors(isDark);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
@@ -690,7 +782,7 @@ export default function BacktestPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key.toLowerCase() === 'z') {
-        setIsZenMode(prev => !prev);
+        setIsSidebarOpen(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -752,9 +844,8 @@ export default function BacktestPage() {
   };
 
   const loadPreset = (preset: typeof HISTORICAL_PRESETS[0]) => {
-    setSelectedAssets([]);
-    setWeights({});
     setStartDate(preset.date);
+    setEndDate(preset.endDate || new Date().toISOString().slice(0, 7));
     const toAdd: Asset[] = preset.assets.map(pa => {
       const found = allAssets.find(a => a.symbol === pa.symbol);
       return {
@@ -771,6 +862,7 @@ export default function BacktestPage() {
     const w: Record<string, number> = {};
     toAdd.forEach((a, i) => { w[a.symbol] = i === toAdd.length - 1 ? 100 - eq * (toAdd.length - 1) : eq; });
     setWeights(w);
+    setTriggerRunKey(prev => prev + 1);
   };
 
   const runSimulation = async () => {
@@ -778,6 +870,7 @@ export default function BacktestPage() {
     setIsLoading(true);
     setSimulationError(null);
     const fullStart = startDate.length === 7 ? `${startDate}-01` : startDate;
+    const fullEnd = endDate.length === 7 ? `${endDate}-01` : endDate;
 
     const total = Object.values(weights).reduce((a, b) => a + b, 0);
     const normW = { ...weights };
@@ -799,13 +892,14 @@ export default function BacktestPage() {
         recurringAmount: isRecurring ? recurringAmount : 0,
         frequency: isRecurring ? frequency : null,
         startDate: fullStart,
+        endDate: fullEnd,
       };
 
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 25000);
       const [portfolioRes, strategiesRes] = await Promise.all([
         fetch("/api/portfolio/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal }),
-        fetch("/api/strategies/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: selectedAssets, strategies: ALL_STRATEGIES.map(s => s.id), startDate: fullStart }), signal: ctrl.signal }),
+        fetch("/api/strategies/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: selectedAssets, strategies: ALL_STRATEGIES.map(s => s.id), startDate: fullStart, endDate: fullEnd }), signal: ctrl.signal }),
       ]).finally(() => clearTimeout(tid));
 
       if (!portfolioRes.ok) {
@@ -986,255 +1080,39 @@ export default function BacktestPage() {
       ════════════════════════════════════════════════════════════════════ */}
       <aside style={{
         width: 340, flexShrink: 0,
-        display: isZenMode ? "none" : "flex", flexDirection: "column",
+        display: isSidebarOpen ? "flex" : "none", flexDirection: "column",
         background: C.surface,
-        borderRight: `1px solid rgba(0,0,0,0.08)`,
+        borderRight: `1px solid ${C.border}`,
       }}>
 
-        {/* Top: Logo + tagline (not scrollable) */}
-        <div style={{ padding: "16px 16px 12px" }}>
+        {/* Top: Logo (not scrollable) */}
+        <div style={{ padding: "18px 16px 16px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{
-            fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em",
-            background: "linear-gradient(135deg, #5E5CE6 0%, #00C087 100%)",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            marginBottom: 3,
+            fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em",
+            color: C.text,
           }}>
-            WhatIfIInvested
-          </div>
-          <div style={{ color: C.muted, fontSize: 11, fontWeight: 500 }}>
-            Stop wondering. Start backtesting.
+            What if I Invested?
           </div>
         </div>
 
-        {/* Middle: scrollable config + asset list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px" }}>
-
-          {/* ── Investment config ── */}
-          {/* Initial Investment */}
-          <div style={{ borderBottom: `1px solid rgba(0,0,0,0.05)`, padding: "10px 0" }}>
-            <p style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
-              Initial Investment
-            </p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-              <span style={{ color: C.muted, fontSize: 16, fontWeight: 400 }}>₹</span>
-              <input
-                type="number"
-                value={initialInvestment}
-                onChange={e => setInitialInvestment(parseInt(e.target.value) || 0)}
-                style={{
-                  background: "transparent", border: "none", outline: "none",
-                  color: C.text, fontSize: 22, fontWeight: 700, width: "100%", fontFamily: "inherit",
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Recurring */}
-          <div style={{ borderBottom: `1px solid rgba(0,0,0,0.05)`, padding: "10px 0" }}>
-            <p style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>
-              Recurring
-            </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {/* Toggle */}
-              <button
-                onClick={() => setIsRecurring(r => !r)}
-                style={{
-                  width: 36, height: 20, borderRadius: 10,
-                  background: isRecurring ? "#34C759" : "rgba(0,0,0,0.12)",
-                  border: "none", cursor: "pointer", position: "relative", flexShrink: 0,
-                  transition: "background 0.22s",
-                }}
-              >
-                <span style={{
-                  position: "absolute", top: 2, left: isRecurring ? 18 : 2,
-                  width: 16, height: 16, borderRadius: "50%", background: "#fff",
-                  transition: "left 0.22s", boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
-                }} />
-              </button>
-              {/* Amount */}
-              <span style={{ color: isRecurring ? C.muted : "rgba(0,0,0,0.2)", fontSize: 14, fontWeight: 400 }}>₹</span>
-              <input
-                type="number"
-                value={recurringAmount}
-                onChange={e => setRecurringAmount(parseInt(e.target.value) || 0)}
-                disabled={!isRecurring}
-                style={{
-                  background: "transparent", border: "none", outline: "none",
-                  color: isRecurring ? C.text : C.muted, fontSize: 16, fontWeight: 700,
-                  width: 80, fontFamily: "inherit",
-                }}
-              />
-              {/* Frequency dropdown */}
-              <div style={{ position: "relative", flex: 1 }}>
-                <button
-                  onClick={() => isRecurring && setFreqOpen(o => !o)}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: "rgba(0,0,0,0.03)",
-                    border: "1px solid rgba(0,0,0,0.08)",
-                    borderRadius: 8, padding: "4px 9px",
-                    cursor: isRecurring ? "pointer" : "default",
-                    color: isRecurring ? C.text : C.muted,
-                    fontSize: 12, fontFamily: "inherit", fontWeight: 500,
-                  }}
-                >
-                  <span>{FREQ_LABELS[frequency]}</span>
-                  <span style={{ fontSize: 9, color: C.muted }}>▾</span>
-                </button>
-                {freqOpen && isRecurring && (
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 3px)", left: 0, right: 0,
-                    background: C.surface, border: "1px solid rgba(0,0,0,0.1)",
-                    borderRadius: 10, overflow: "hidden", zIndex: 200,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-                  }}>
-                    {["weekly", "monthly", "quarterly", "yearly"].map(f => (
-                      <button key={f} onClick={() => { setFrequency(f); setFreqOpen(false); }}
-                        style={{
-                          width: "100%", padding: "9px 12px",
-                          background: frequency === f ? `${C.accent}10` : "transparent",
-                          border: "none",
-                          color: frequency === f ? C.accent : C.text,
-                          fontSize: 12, cursor: "pointer", textAlign: "left",
-                          fontFamily: "inherit", fontWeight: frequency === f ? 700 : 400,
-                          borderBottom: "1px solid rgba(0,0,0,0.04)",
-                        }}>
-                        {FREQ_LABELS[f]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Start Date */}
-          <div style={{ padding: "4px 0" }}>
-            <p style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, paddingLeft: 4 }}>
-              Start Date
-            </p>
-            <CustomMonthPicker
-              value={startDate}
-              onChange={setStartDate}
-              maxDate={new Date().toISOString().slice(0, 7)}
-            />
-          </div>
-
-          {/* Thin divider */}
-          <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "12px 0" }} />
-
-          {/* Category tabs — horizontal scrollable single row */}
-          <div style={{ display: "flex", gap: 5, overflowX: "auto", paddingBottom: 6, scrollbarWidth: "none", marginBottom: 8 }}>
-            {CATEGORIES.map(cat => (
-              <button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  flexShrink: 0,
-                  padding: "6px 11px", borderRadius: 20,
-                  border: selectedCategory === cat.id ? `1px solid ${C.accent}40` : "1px solid rgba(0,0,0,0.07)",
-                  background: selectedCategory === cat.id ? `${C.accent}0D` : "transparent",
-                  color: selectedCategory === cat.id ? C.accent : C.muted,
-                  fontSize: 11, fontWeight: selectedCategory === cat.id ? 700 : 500,
-                  cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
-                  whiteSpace: "nowrap",
-                }}>
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div style={{ position: "relative", marginBottom: 8 }}>
-            <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: C.muted }} />
-            <input
-              placeholder="Search stocks, ETFs, funds…"
-              value={assetSearch}
-              onChange={e => setAssetSearch(e.target.value)}
+        {/* Selected asset chips */}
+        <div style={{ padding: "16px 16px 8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Selected Assets ({selectedAssets.length}/10)</span>
+            <button 
+              onClick={() => setIsAssetModalOpen(true)}
               style={{
-                width: "100%",
-                background: "rgba(0,0,0,0.03)",
-                border: "1px solid rgba(0,0,0,0.07)",
-                borderRadius: 10, padding: "8px 10px 8px 32px",
-                color: C.text, fontSize: 12, outline: "none", fontFamily: "inherit",
+                background: C.accent, color: "#fff", border: "none", borderRadius: 6,
+                padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                transition: "opacity 0.2s",
               }}
-            />
+            >
+              + Add Assets
+            </button>
           </div>
-
-          {/* Asset list */}
-          <div style={{
-            background: C.surface, border: "1px solid rgba(0,0,0,0.07)",
-            borderRadius: 14, overflow: "hidden",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-            marginBottom: 8,
-          }}>
-            <div style={{
-              padding: "8px 12px",
-              borderBottom: "1px solid rgba(0,0,0,0.05)",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}>
-              <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                {CATEGORIES.find(c => c.id === selectedCategory)?.label || "Assets"}
-              </span>
-              <span style={{ color: C.muted, fontSize: 10, fontWeight: 500 }}>{selectedAssets.length}/10</span>
-            </div>
-            <div style={{ maxHeight: 280, overflowY: "auto" }}>
-              {assetsLoading ? (
-                <div style={{ padding: "28px 12px", textAlign: "center", color: C.muted, fontSize: 12 }}>
-                  Loading assets…
-                </div>
-              ) : filteredAssets.length === 0 ? (
-                <div style={{ padding: "28px 12px", textAlign: "center", color: C.muted, fontSize: 12 }}>
-                  No assets found
-                </div>
-              ) : (
-                filteredAssets.map((asset, idx) => {
-                  const isSelected = !!selectedAssets.find(a => a.symbol === asset.symbol);
-                  const { ticker, sub } = getDisplayInfo(asset);
-                  const positive = (asset.priceChangePercent || 0) >= 0;
-                  return (
-                    <button
-                      key={asset.symbol}
-                      onClick={() => isSelected ? removeAsset(asset.symbol) : addAsset(asset)}
-                      style={{
-                        width: "100%", display: "flex", alignItems: "center", gap: 8,
-                        padding: "8px 12px",
-                        background: isSelected ? `${C.accent}08` : "transparent",
-                        border: "none", borderBottom: "1px solid rgba(0,0,0,0.03)",
-                        cursor: "pointer", textAlign: "left",
-                        transition: "background 0.12s", fontFamily: "inherit",
-                      }}
-                    >
-                      <AssetIcon symbol={asset.symbol} name={asset.name} type={asset.assetType} size={30} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: C.text, fontSize: 12, fontWeight: 700, lineHeight: 1.2 }}>{ticker}</div>
-                        <div style={{ color: C.muted, fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{sub}</div>
-                      </div>
-                      <Sparkline positive={positive} seed={idx + 1} />
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ color: C.text, fontSize: 11, fontWeight: 600 }}>
-                          {asset.currentPrice ? `₹${asset.currentPrice.toLocaleString("en-IN")}` : "—"}
-                        </div>
-                        <div style={{ color: positive ? C.green : C.red, fontSize: 10 }}>
-                          {positive ? "↑" : "↓"}{Math.abs(asset.priceChangePercent || 0).toFixed(2)}%
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div style={{
-                          width: 16, height: 16, borderRadius: "50%", background: C.accent,
-                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                        }}>
-                          <Check style={{ width: 9, height: 9, color: "#fff" }} />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Selected asset chips */}
+          
           <AnimatePresence>
-            {selectedAssets.length > 0 && (
+            {selectedAssets.length > 0 ? (
               <motion.div
                 initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                 style={{ marginBottom: 8 }}
@@ -1248,24 +1126,81 @@ export default function BacktestPage() {
                     return (
                       <div key={a.symbol} style={{
                         display: "flex", alignItems: "center", gap: 4,
-                        background: `${C.accent}0D`, border: `1px solid ${C.accent}30`,
-                        borderRadius: 20, padding: "2px 8px 2px 4px",
+                        background: C.accentLight, border: `1px solid ${C.accent}25`,
+                        borderRadius: 6, padding: "5px 9px 5px 6px",
                       }}>
                         <AssetIcon symbol={a.symbol} name={a.name} type={a.type} size={16} />
-                        <span style={{ color: C.accent, fontSize: 10, fontWeight: 700 }}>{ticker}</span>
+                        <span style={{ color: C.accent, fontSize: 11, fontWeight: 600 }}>{ticker}</span>
                         <button onClick={() => removeAsset(a.symbol)} style={{
                           background: "none", border: "none", cursor: "pointer",
-                          color: C.muted, padding: 0, display: "flex", lineHeight: 1,
+                          color: C.accent, padding: 0, display: "flex", lineHeight: 1,
+                          marginLeft: 2, opacity: 0.7,
                         }}>
-                          <X style={{ width: 10, height: 10 }} />
+                          <X style={{ width: 11, height: 11 }} />
                         </button>
                       </div>
                     );
                   })}
                 </div>
               </motion.div>
+            ) : (
+              <div style={{ 
+                border: `1px dashed ${C.border}`, borderRadius: 8, padding: "20px", 
+                textAlign: "center", background: "rgba(0,0,0,0.01)" 
+              }}>
+                <p style={{ color: C.muted, fontSize: 12 }}>No assets selected.</p>
+                <p style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>Add at least one to run a simulation.</p>
+              </div>
             )}
           </AnimatePresence>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px 0" }}>
+
+          {/* Weight Allocation */}
+          {selectedAssets.length > 1 && (() => {
+            const total = Object.values(weights).reduce((a, b) => a + b, 0);
+            return (
+              <div style={{
+                marginBottom: 8, background: C.surface,
+                border: "1px solid rgba(0,0,0,0.07)", borderRadius: 10, overflow: "hidden",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+              }}>
+                <div style={{
+                  padding: "6px 12px", borderBottom: "1px solid rgba(0,0,0,0.05)",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  background: "rgba(0,0,0,0.01)",
+                }}>
+                  <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>Allocation</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: total === 100 ? C.green : C.amber, fontVariantNumeric: "tabular-nums" }}>{total}%</span>
+                </div>
+                {selectedAssets.map(a => {
+                  const ai = allAssets.find(al => al.symbol === a.symbol);
+                  const { ticker } = ai ? getDisplayInfo(ai) : { ticker: a.symbol.replace(".NS","").replace("-USD","") };
+                  return (
+                    <div key={a.symbol} style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "5px 12px", borderBottom: "1px solid rgba(0,0,0,0.03)",
+                    }}>
+                      <AssetIcon symbol={a.symbol} name={a.name} type={a.type} size={16} />
+                      <span style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.text }}>{ticker}</span>
+                      <input
+                        type="number" min={0} max={100}
+                        value={weights[a.symbol] ?? 0}
+                        onChange={e => setWeights(prev => ({ ...prev, [a.symbol]: Math.max(0, Math.min(100, Number(e.target.value))) }))}
+                        style={{
+                          width: 42, textAlign: "right", border: "1px solid rgba(0,0,0,0.1)",
+                          borderRadius: 5, padding: "2px 4px", fontSize: 11, fontWeight: 700,
+                          color: C.text, background: "rgba(0,0,0,0.02)", fontFamily: "inherit",
+                          outline: "none",
+                        }}
+                      />
+                      <span style={{ fontSize: 10, color: C.muted }}>%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Error */}
           {simulationError && (
@@ -1279,44 +1214,232 @@ export default function BacktestPage() {
           )}
         </div>
 
-        {/* Bottom: Run Simulation (not scrollable) */}
+        {/* Bottom: Export/New + Run Simulation (not scrollable) */}
         <div style={{
-          padding: 12,
-          borderTop: "1px solid rgba(0,0,0,0.06)",
+          padding: "10px 12px 14px",
+          borderTop: `1px solid ${C.border}`,
           background: C.surface,
         }}>
+          {/* Export / New row */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <button
+              onClick={async () => {
+                if (!analysis) return;
+                setIsGeneratingPDF(true);
+                try {
+                  const html2canvas = (await import("html2canvas")).default;
+                  const { jsPDF } = await import("jspdf");
+                  const el = document.getElementById("report-capture-area");
+                  if (!el) return;
+                  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: C.bg });
+                  const imgData = canvas.toDataURL("image/png");
+                  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                  const pdfWidth = pdf.internal.pageSize.getWidth();
+                  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                  pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+                  pdf.save(`Zen-Report-${new Date().toISOString().split("T")[0]}.pdf`);
+                } catch (e) { console.error("PDF failed", e); }
+                finally { setIsGeneratingPDF(false); }
+              }}
+              disabled={isGeneratingPDF || !analysis}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                padding: "7px 0", background: "transparent",
+                border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.muted, fontSize: 11, fontWeight: 500,
+                cursor: (isGeneratingPDF || !analysis) ? "not-allowed" : "pointer", fontFamily: "inherit",
+                opacity: (isGeneratingPDF || !analysis) ? 0.4 : 1,
+              }}
+            >
+              <Download style={{ width: 12, height: 12 }} />
+              Export PDF
+            </button>
+            <button
+              onClick={() => { setAnalysis(null); setStrategyResults([]); setChartSignals([]); setExpandedStrategy(null); }}
+              disabled={!analysis}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                padding: "7px 0", background: "transparent",
+                border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.muted, fontSize: 11, fontWeight: 500,
+                cursor: !analysis ? "not-allowed" : "pointer", fontFamily: "inherit",
+                opacity: !analysis ? 0.4 : 1,
+              }}
+            >
+              <RefreshCw style={{ width: 12, height: 12 }} />
+              New
+            </button>
+          </div>
+          {/* Run Simulation */}
           <button
             onClick={runSimulation}
             disabled={isLoading || selectedAssets.length === 0}
             style={{
-              width: "100%", padding: "14px 20px",
+              width: "100%", padding: "13px 20px",
               background: selectedAssets.length === 0
-                ? "rgba(0,0,0,0.06)"
+                ? (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)")
                 : isLoading
-                  ? `${C.accent}80`
-                  : `linear-gradient(135deg, ${C.accent} 0%, #007AFF 50%, #34C759 100%)`,
-              border: "none", borderRadius: 12,
+                  ? `${C.accent}CC`
+                  : C.accent,
+              border: "none", borderRadius: 10,
               color: selectedAssets.length === 0 ? C.muted : "#fff",
-              fontSize: 15, fontWeight: 700,
+              fontSize: 14, fontWeight: 600,
               cursor: selectedAssets.length === 0 ? "not-allowed" : "pointer",
-              transition: "opacity 0.2s", fontFamily: "inherit",
-              letterSpacing: "0.01em",
+              transition: "background 0.15s, opacity 0.15s", fontFamily: "inherit",
+              letterSpacing: "-0.01em",
               boxShadow: selectedAssets.length > 0 && !isLoading
-                ? `0 4px 20px ${C.accent}55, 0 1px 4px rgba(0,0,0,0.1)`
+                ? "0 2px 8px rgba(41,98,255,0.3)"
                 : "none",
             }}
           >
             {isLoading ? (
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                <RefreshCw style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} />
-                Running Simulation…
+                <RefreshCw style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} />
+                Running simulation…
               </span>
             ) : selectedAssets.length === 0
               ? "Select assets to simulate"
-              : "Run Simulation →"}
+              : `Run Simulation (${selectedAssets.length})`}
           </button>
         </div>
       </aside>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          ASSET MODAL OVERLAY
+      ════════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {isAssetModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setIsAssetModalOpen(false)}
+            style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+              zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: "100%", maxWidth: 640, height: "85vh", maxHeight: 700,
+                background: C.bg, borderRadius: 20,
+                boxShadow: "0 24px 48px rgba(0,0,0,0.25)",
+                display: "flex", flexDirection: "column",
+                overflow: "hidden", border: `1px solid ${C.border}`,
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.surface }}>
+                 <div>
+                   <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0, letterSpacing: "-0.02em" }}>Add Assets to Portfolio</h2>
+                   <p style={{ color: C.muted, fontSize: 13, margin: "4px 0 0 0" }}>Search and select up to 10 assets to backtest.</p>
+                 </div>
+                 <button onClick={() => setIsAssetModalOpen(false)} style={{ background: "rgba(0,0,0,0.05)", border: "none", borderRadius: "50%", padding: 6, cursor: "pointer", color: C.muted, display: "flex" }}>
+                   <X size={18} />
+                 </button>
+              </div>
+
+              {/* Modal Search & Filters */}
+              <div style={{ padding: "16px 24px", background: C.surface, borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 12, scrollbarWidth: "none" }}>
+                  {CATEGORIES.map(cat => (
+                    <button key={cat.id} onClick={() => setSelectedCategory(cat.id)}
+                      style={{
+                        flexShrink: 0, padding: "6px 14px", borderRadius: 20,
+                        border: selectedCategory === cat.id ? `1px solid ${C.accent}` : `1px solid ${C.border}`,
+                        background: selectedCategory === cat.id ? C.accent : "transparent",
+                        color: selectedCategory === cat.id ? "#fff" : C.muted,
+                        fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit",
+                      }}>
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ position: "relative" }}>
+                  <Search style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: C.muted }} />
+                  <input
+                    placeholder="Search stocks, ETFs, funds by name or symbol…"
+                    value={assetSearch}
+                    onChange={e => setAssetSearch(e.target.value)}
+                    style={{
+                      width: "100%", background: C.bg, border: `1px solid ${C.border}`,
+                      borderRadius: 12, padding: "12px 14px 12px 42px",
+                      color: C.text, fontSize: 14, outline: "none", fontFamily: "inherit",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Asset List */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", background: C.bg }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Available Assets
+                  </span>
+                  <span style={{ color: C.accent, fontSize: 12, fontWeight: 600 }}>{selectedAssets.length} / 10 Selected</span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {assetsLoading ? (
+                    <div style={{ padding: "40px", textAlign: "center", color: C.muted, gridColumn: "1/-1" }}>Loading assets…</div>
+                  ) : filteredAssets.length === 0 ? (
+                    <div style={{ padding: "40px", textAlign: "center", color: C.muted, gridColumn: "1/-1" }}>No assets found matching "{assetSearch}"</div>
+                  ) : (
+                    filteredAssets.map((asset) => {
+                      const isSelected = !!selectedAssets.find(a => a.symbol === asset.symbol);
+                      const { ticker, sub } = getDisplayInfo(asset);
+                      const unitInfo = COMMODITY_UNIT[asset.symbol];
+                      const displayPrice = asset.currentPrice ? (unitInfo ? asset.currentPrice / unitInfo.divisor : asset.currentPrice) : null;
+                      const unitLabel = unitInfo?.label ?? "";
+                      
+                      return (
+                        <button
+                          key={asset.symbol}
+                          onClick={() => isSelected ? removeAsset(asset.symbol) : addAsset(asset)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 12, padding: "12px",
+                            background: isSelected ? C.accentLight : C.surface,
+                            border: `1px solid ${isSelected ? C.accent : C.border}`,
+                            borderRadius: 12, cursor: "pointer", textAlign: "left",
+                            transition: "all 0.2s", boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+                          }}
+                        >
+                          <AssetIcon symbol={asset.symbol} name={asset.name} type={asset.assetType} size={36} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: C.text, fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>{ticker}</div>
+                            <div style={{ color: C.muted, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>{sub}</div>
+                          </div>
+                          {displayPrice != null && (
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ color: C.text, fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                ₹{displayPrice.toLocaleString("en-IN", { maximumFractionDigits: unitInfo?.divisor === 31.1035 ? 2 : 0 })}
+                              </div>
+                              {unitInfo && (
+                                <div style={{ color: C.muted, fontSize: 10, fontWeight: 500, marginTop: 2 }}>
+                                  {unitInfo.divisor === 31.1035 ? "per gram" : `per ${unitInfo.label.replace("/", "")}`}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div style={{
+                            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                            background: isSelected ? C.accent : C.bg, border: `1px solid ${isSelected ? C.accent : C.border}`,
+                            display: "flex", alignItems: "center", justifyContent: "center", marginLeft: 4,
+                          }}>
+                            {isSelected ? <Check size={14} color="#fff" /> : <span style={{ color: C.text, fontSize: 16, lineHeight: 1 }}>+</span>}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ════════════════════════════════════════════════════════════════════
           MAIN AREA
@@ -1326,152 +1449,221 @@ export default function BacktestPage() {
         {/* Sticky header */}
         <div style={{
           position: "sticky", top: 0, zIndex: 40,
-          background: "rgba(240,242,245,0.92)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
-          padding: "14px 28px",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: isDark ? "rgba(15,17,23,0.92)" : "rgba(242,243,245,0.92)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: `1px solid ${C.border}`,
+          padding: "10px 20px",
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
         }}>
-          <div>
-            <div style={{
-              fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em",
-              background: "linear-gradient(135deg, #5E5CE6 0%, #00C087 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            }}>
-              WhatIfIInvested
-            </div>
-            <div style={{ color: C.muted, fontSize: 10, fontWeight: 500, marginTop: 1 }}>
-              Stop wondering. Start backtesting.
+          {/* Left: toggle + title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => setIsSidebarOpen(v => !v)}
+              title="Toggle sidebar (Z)"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30,
+                background: isSidebarOpen ? "transparent" : C.accentLight,
+                border: `1px solid ${isSidebarOpen ? C.border : C.accent + "40"}`,
+                borderRadius: 7, color: isSidebarOpen ? C.muted : C.accent,
+                cursor: "pointer", transition: "all 0.15s",
+              }}>
+              <PanelLeft size={14} />
+            </button>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+              {analysis ? selectedAssets.map(a => a.symbol.replace(".NS","").replace("-USD","")).join(", ") : "Backtest Lab"}
             </div>
           </div>
-          {analysis && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button
-                onClick={() => setIsZenMode(z => !z)}
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: C.border, flexShrink: 0 }} />
+
+          {/* Inline: Initial Investment */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Initial</span>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 3,
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 7, padding: "4px 8px",
+            }}>
+              <span style={{ color: C.muted, fontSize: 12 }}>₹</span>
+              <input
+                type="number"
+                value={initialInvestment}
+                onChange={e => setInitialInvestment(parseInt(e.target.value) || 0)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 12px", background: isZenMode ? `${C.accent}15` : "transparent",
-                  border: `1px solid ${isZenMode ? C.accent : "transparent"}`,
-                  borderRadius: 12, color: isZenMode ? C.accent : C.muted,
-                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-                  transition: "all 0.15s",
-                }}>
-                {isZenMode ? "Exit Zen Mode" : "Zen Mode"} <kbd style={{ padding: "1px 5px", background: "rgba(0,0,0,0.06)", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}>Z</kbd>
-              </button>
-              <button
-                onClick={async () => {
-                  if (!analysis) return;
-                  setIsGeneratingPDF(true);
-                  try {
-                    const html2canvas = (await import("html2canvas")).default;
-                    const { jsPDF } = await import("jspdf");
-                    
-                    const el = document.getElementById("report-capture-area");
-                    if (!el) return;
-                    
-                    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: C.bg });
-                    const imgData = canvas.toDataURL("image/png");
-                    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-                    
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-                    pdf.save(`Zen-Report-${new Date().toISOString().split("T")[0]}.pdf`);
-                  } catch (e) {
-                    console.error("PDF failed", e);
-                  } finally {
-                    setIsGeneratingPDF(false);
-                  }
+                  background: "transparent", border: "none", outline: "none",
+                  color: C.text, fontSize: 13, fontWeight: 700, width: 80, fontFamily: "inherit",
                 }}
-                disabled={isGeneratingPDF}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 14px", background: C.surface,
-                  border: "1px solid rgba(0,0,0,0.08)", borderRadius: 10,
-                  color: C.textSub, fontSize: 12, fontWeight: 600,
-                  cursor: isGeneratingPDF ? "wait" : "pointer", fontFamily: "inherit",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                  opacity: isGeneratingPDF ? 0.7 : 1,
-                  transition: "all 0.15s",
-                }}
-              >
-                <Download style={{ width: 13, height: 13 }} />
-                {isGeneratingPDF ? "Exporting..." : "Export PDF"}
-              </button>
-              <button
-                onClick={() => { setAnalysis(null); setStrategyResults([]); setChartSignals([]); setExpandedStrategy(null); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 14px", background: C.surface,
-                  border: "1px solid rgba(0,0,0,0.08)", borderRadius: 10,
-                  color: C.textSub, fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                }}
-              >
-                <RefreshCw style={{ width: 13, height: 13 }} />
-                New Simulation
-              </button>
+              />
             </div>
-          )}
+          </div>
+
+          {/* Inline: Recurring */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Recurring</span>
+            <button
+              onClick={() => setIsRecurring(r => !r)}
+              style={{
+                width: 30, height: 17, borderRadius: 9,
+                background: isRecurring ? C.accent : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"),
+                border: "none", cursor: "pointer", position: "relative", flexShrink: 0,
+                transition: "background 0.2s",
+              }}
+            >
+              <span style={{
+                position: "absolute", top: 2, left: isRecurring ? 14 : 2,
+                width: 13, height: 13, borderRadius: "50%", background: "#fff",
+                transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+            </button>
+            {isRecurring && (
+              <>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 3,
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 7, padding: "4px 8px",
+                }}>
+                  <span style={{ color: C.muted, fontSize: 12 }}>₹</span>
+                  <input
+                    type="number"
+                    value={recurringAmount}
+                    onChange={e => setRecurringAmount(parseInt(e.target.value) || 0)}
+                    style={{
+                      background: "transparent", border: "none", outline: "none",
+                      color: C.text, fontSize: 13, fontWeight: 700, width: 68, fontFamily: "inherit",
+                    }}
+                  />
+                </div>
+                {/* Frequency dropdown */}
+                <div style={{ position: "relative" }}>
+                  <button
+                    onClick={() => setFreqOpen(o => !o)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      background: C.surface, border: `1px solid ${C.border}`,
+                      borderRadius: 7, padding: "4px 8px",
+                      cursor: "pointer", color: C.text, fontSize: 12, fontFamily: "inherit", fontWeight: 500,
+                    }}
+                  >
+                    {FREQ_LABELS[frequency]}
+                    <ChevronDown size={10} color={C.muted} />
+                  </button>
+                  {freqOpen && (
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 4px)", left: 0,
+                      background: C.surface, border: `1px solid ${C.border}`,
+                      borderRadius: 9, overflow: "hidden", zIndex: 300,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.15)", minWidth: 110,
+                    }}>
+                      {["weekly", "monthly", "quarterly", "yearly"].map(f => (
+                        <button key={f} onClick={() => { setFrequency(f); setFreqOpen(false); }}
+                          style={{
+                            width: "100%", padding: "8px 12px",
+                            background: frequency === f ? C.accentLight : "transparent",
+                            border: "none", color: frequency === f ? C.accent : C.text,
+                            fontSize: 12, cursor: "pointer", textAlign: "left",
+                            fontFamily: "inherit", fontWeight: frequency === f ? 600 : 400,
+                          }}>
+                          {FREQ_LABELS[f]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Inline: Date range */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            <Calendar size={12} color={C.muted} />
+            <CustomMonthPicker value={startDate} onChange={setStartDate} maxDate={endDate} label="Start" isDark={isDark} />
+            <span style={{ color: C.muted, fontSize: 12 }}>→</span>
+            <CustomMonthPicker value={endDate} onChange={setEndDate} minDate={startDate} maxDate={new Date().toISOString().slice(0, 7)} label="End" isDark={isDark} />
+          </div>
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* Right: only dark/light mode toggle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => setIsDark(d => !d)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30,
+                background: isDark ? "rgba(251,191,36,0.12)" : "rgba(0,0,0,0.04)",
+                border: `1px solid ${isDark ? "rgba(251,191,36,0.3)" : C.border}`,
+                borderRadius: 7, cursor: "pointer", transition: "all 0.2s",
+              }}
+            >
+              {isDark ? <Sun size={14} color="#FBBF24" /> : <Moon size={14} color={C.muted} />}
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div id="report-capture-area" style={{ padding: "20px 28px" }}>
 
           {/* Historical Presets row */}
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 20, scrollbarWidth: "none" }}>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 20, scrollbarWidth: "none", alignItems: "center" }}>
             <span style={{
-              flexShrink: 0, alignSelf: "center",
+              flexShrink: 0,
               color: C.muted, fontSize: 10, fontWeight: 600,
-              textTransform: "uppercase", letterSpacing: "0.07em", marginRight: 2,
-            }}>Try:</span>
+              textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 2,
+            }}>Try</span>
             {HISTORICAL_PRESETS.map(preset => (
               <button
                 key={preset.id}
                 onClick={() => loadPreset(preset)}
                 style={{
-                  flexShrink: 0, display: "flex", alignItems: "center", gap: 7,
-                  padding: "8px 14px", borderRadius: 10,
-                  background: C.surface, border: `1px solid ${preset.color}28`,
+                  flexShrink: 0, display: "flex", alignItems: "center", gap: 5,
+                  padding: "5px 11px", borderRadius: 6,
+                  background: C.surface, border: `1px solid rgba(0,0,0,0.09)`,
                   cursor: "pointer", fontFamily: "inherit",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                  transition: "all 0.15s ease",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                  transition: "border-color 0.15s",
                 }}
               >
-                <span style={{ fontSize: 15 }}>{preset.icon}</span>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>{preset.label}</div>
-                  <div style={{ color: C.muted, fontSize: 9, marginTop: 1 }}>from {preset.date}</div>
-                </div>
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <div style={{ color: C.text, fontSize: 11, fontWeight: 500 }}>{preset.icon} {preset.label}</div>
+                <div style={{ color: C.muted, fontSize: 9 }}>{preset.date}{preset.endDate ? ` → ${preset.endDate}` : ""}</div>
+              </div>
+            </button>
             ))}
           </div>
 
           {/* ── NO SIMULATION: Empty state with DYK ── */}
           {!analysis && (
             <div style={{
-              ...card,
-              minHeight: 400,
+              ...getCardStyle(C),
+              minHeight: 420,
               display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center",
-              gap: 16,
+              gap: 20,
             }}>
-              <TrendingUp style={{ width: 28, height: 28, color: C.muted }} />
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(0,0,0,0.04)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <TrendingUp style={{ width: 20, height: 20, color: C.muted }} />
+              </div>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={dykIdx}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.32 }}
-                  style={{ textAlign: "center", maxWidth: 420 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.28 }}
+                  style={{ textAlign: "center", maxWidth: 440 }}
                 >
-                  <p style={{ color: C.muted, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
+                  <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 14 }}>
                     Did you know?
                   </p>
-                  <p style={{ color: C.text, fontSize: 20, fontWeight: 700, lineHeight: 1.45, marginBottom: 18 }}>
+                  <p style={{ color: C.text, fontSize: 19, fontWeight: 600, lineHeight: 1.5, marginBottom: 20, letterSpacing: "-0.01em" }}>
                     {DID_YOU_KNOW[dykIdx].text}
                   </p>
                   {DID_YOU_KNOW[dykIdx].preset && (
@@ -1481,28 +1673,28 @@ export default function BacktestPage() {
                         if (p) loadPreset(p);
                       }}
                       style={{
-                        padding: "9px 20px",
-                        background: `${C.accent}0D`,
+                        padding: "8px 18px",
+                        background: C.accentLight,
                         border: `1px solid ${C.accent}30`,
-                        borderRadius: 10, cursor: "pointer",
-                        color: C.accent, fontSize: 13, fontWeight: 700,
+                        borderRadius: 8, cursor: "pointer",
+                        color: C.accent, fontSize: 12, fontWeight: 600,
                         fontFamily: "inherit",
                       }}
                     >
-                      Try This →
+                      Explore this scenario
                     </button>
                   )}
                 </motion.div>
               </AnimatePresence>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 5 }}>
                 {DID_YOU_KNOW.map((_, i) => (
                   <div
                     key={i}
                     onClick={() => setDykIdx(i)}
                     style={{
-                      width: i === dykIdx ? 18 : 6, height: 6, borderRadius: 3,
+                      width: i === dykIdx ? 16 : 5, height: 5, borderRadius: 3,
                       background: i === dykIdx ? C.accent : "rgba(0,0,0,0.1)",
-                      transition: "all 0.35s", cursor: "pointer",
+                      transition: "all 0.3s", cursor: "pointer",
                     }}
                   />
                 ))}
@@ -1519,25 +1711,31 @@ export default function BacktestPage() {
               transition={{ duration: 0.4, ease: "easeOut" }}
             >
               {/* Stats bar */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
                 {[
                   { label: "Total Invested", value: formatCurrency(analysis.totalInvested), trend: null, pos: true },
                   { label: "Current Value", value: formatCurrency(analysis.currentValue), trend: `${analysis.percentReturn?.toFixed(1) ?? 0}%`, pos: analysis.currentValue >= analysis.totalInvested },
                   { label: "Absolute Return", value: formatCurrency(analysis.absoluteReturn), trend: `${analysis.percentReturn?.toFixed(1) ?? 0}%`, pos: analysis.absoluteReturn >= 0 },
-                  { label: "CAGR", value: `${analysis.cagr}%`, trend: analysis.cagr > 12 ? "Above avg" : "Below avg", pos: analysis.cagr >= 0 },
+                  { label: "CAGR", value: `${analysis.cagr}%`, trend: analysis.cagr >= 12 ? "vs 12% avg" : "vs 12% avg", pos: analysis.cagr >= 12 },
+                  { label: "Max Drawdown", value: analysis.riskMetrics ? `-${analysis.riskMetrics.maxDrawdown}%` : "—", trend: "risk measure", pos: false },
                 ].map(c => (
                   <div key={c.label} style={{
                     background: C.surface,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 14, padding: "14px 16px",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                    border: `1px solid rgba(0,0,0,0.07)`,
+                    borderRadius: 12, padding: "16px 18px",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                   }}>
-                    <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>{c.label}</p>
-                    <p style={{ color: C.text, fontSize: 17, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.01em" }}>{c.value}</p>
+                    <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{c.label}</p>
+                    <p style={{ color: C.text, fontSize: 18, fontWeight: 700, marginBottom: 5, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{c.value}</p>
                     {c.trend !== null && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                        <span style={{ color: c.pos ? C.green : C.red, fontSize: 11 }}>{c.pos ? "↑" : "↓"}</span>
-                        <span style={{ color: c.pos ? C.green : C.red, fontSize: 11, fontWeight: 600 }}>{c.trend}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{
+                          padding: "2px 6px", borderRadius: 4,
+                          background: c.pos ? C.greenLight : C.redLight,
+                          color: c.pos ? C.green : C.red,
+                          fontSize: 10, fontWeight: 600,
+                        }}>{c.pos ? "+" : ""}{c.trend}</span>
+                        <span style={{ color: C.muted, fontSize: 10 }}>{c.trend.includes("avg") ? "" : "total return"}</span>
                       </div>
                     )}
                   </div>
@@ -1546,9 +1744,9 @@ export default function BacktestPage() {
 
               {/* Chart card */}
               <div style={{
-                background: C.surface, borderRadius: 16, padding: "20px 24px",
-                border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+                background: C.surface, borderRadius: 14, padding: "20px 24px",
+                border: `1px solid rgba(0,0,0,0.07)`,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)",
                 marginBottom: 16,
               }}>
                 <PerformanceChart
@@ -1561,56 +1759,62 @@ export default function BacktestPage() {
                   benchmarks={analysis.benchmarks as import("@/types").BenchmarkData | undefined}
                   activeBenchmarks={activeBenchmarks}
                   inflationAdjusted={inflationAdjusted}
+                  isDark={isDark}
                 />
                 {/* Benchmark toggles */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0 0", flexWrap: "wrap" }}>
-                  <span style={{ color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>Compare vs:</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "14px 0 0", flexWrap: "wrap" }}>
+                  <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 2 }}>Benchmark</span>
                   {[
-                    { id: "nifty", label: "Nifty 50", color: "#FF9F0A" },
-                    { id: "gold", label: "Gold", color: "#B8860B" },
-                    { id: "fd", label: "FD 6.5%", color: "#00C087" },
+                    { id: "nifty", label: "Nifty 50", color: "#D97706" },
+                    { id: "gold", label: "Gold", color: "#92400E" },
+                    { id: "fd", label: "FD 6.5%", color: "#065F46" },
                   ].map(b => (
                     <button key={b.id} onClick={() => toggleBenchmark(b.id)} style={{
-                      padding: "5px 12px", borderRadius: 20,
-                      border: `1px solid ${activeBenchmarks.has(b.id) ? b.color : "rgba(0,0,0,0.1)"}`,
-                      background: activeBenchmarks.has(b.id) ? `${b.color}15` : "transparent",
+                      padding: "4px 10px", borderRadius: 6,
+                      border: `1px solid ${activeBenchmarks.has(b.id) ? b.color + "80" : "rgba(0,0,0,0.09)"}`,
+                      background: activeBenchmarks.has(b.id) ? b.color + "14" : "transparent",
                       color: activeBenchmarks.has(b.id) ? b.color : C.muted,
-                      fontSize: 12, fontWeight: activeBenchmarks.has(b.id) ? 700 : 500,
-                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                      fontSize: 11, fontWeight: activeBenchmarks.has(b.id) ? 600 : 400,
+                      cursor: "pointer", fontFamily: "inherit", transition: "all 0.12s",
                     }}>{b.label}</button>
                   ))}
                   <button onClick={() => setInflationAdjusted(v => !v)} style={{
-                    padding: "5px 12px", borderRadius: 20,
-                    border: `1px solid ${inflationAdjusted ? C.accent : "rgba(0,0,0,0.1)"}`,
-                    background: inflationAdjusted ? `${C.accent}12` : "transparent",
+                    padding: "4px 10px", borderRadius: 6,
+                    border: `1px solid ${inflationAdjusted ? C.accent + "60" : "rgba(0,0,0,0.09)"}`,
+                    background: inflationAdjusted ? C.accentLight : "transparent",
                     color: inflationAdjusted ? C.accent : C.muted,
-                    fontSize: 12, fontWeight: inflationAdjusted ? 700 : 500,
-                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                    marginLeft: 4,
-                  }}>Inflation Adj.</button>
+                    fontSize: 11, fontWeight: inflationAdjusted ? 600 : 400,
+                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.12s",
+                    marginLeft: 2,
+                  }}>Real (inflation adj.)</button>
                 </div>
               </div>
 
               {/* Analysis tabs */}
               <div style={{
-                background: C.surface, borderRadius: 16, padding: "0 0 20px",
-                border: `1px solid ${C.border}`,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+                background: C.surface, borderRadius: 14, padding: "0 0 24px",
+                border: `1px solid rgba(0,0,0,0.07)`,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)",
               }}>
                 {/* Tab bar */}
                 <div style={{ display: "flex", gap: 0, borderBottom: "1px solid rgba(0,0,0,0.07)", marginBottom: 20, overflowX: "auto", scrollbarWidth: "none" }}>
-                  {["overview", "projections", "strategies", "holdings", "risk", "insights", "compare"].map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} style={{
-                      padding: "11px 18px", border: "none", background: "transparent",
-                      color: activeTab === tab ? C.accent : C.muted,
-                      fontWeight: activeTab === tab ? 700 : 500,
+                  {[
+                    { id: "overview", label: "Overview" },
+                    { id: "compare", label: "Compare" },
+                    { id: "risk", label: "Risk" },
+                    { id: "learn", label: "Learn" },
+                    { id: "planner", label: "Planner" },
+                  ].map(tab => (
+                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                      padding: "12px 16px", border: "none", background: "transparent",
+                      color: activeTab === tab.id ? C.text : C.muted,
+                      fontWeight: activeTab === tab.id ? 600 : 400,
                       fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                      borderBottom: activeTab === tab ? `2px solid ${C.accent}` : "2px solid transparent",
-                      textTransform: "capitalize",
-                      transition: "all 0.15s",
-                      whiteSpace: "nowrap"
+                      borderBottom: activeTab === tab.id ? `2px solid ${C.accent}` : "2px solid transparent",
+                      transition: "color 0.15s",
+                      whiteSpace: "nowrap",
                     }}>
-                      {tab === "overview" ? "Overview" : tab === "projections" ? "Projections" : tab === "strategies" ? "Strategies" : tab === "holdings" ? "Holdings" : tab === "risk" ? "Risk" : tab === "insights" ? "Insights" : "Compare"}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
@@ -1621,52 +1825,50 @@ export default function BacktestPage() {
                     <div>
                       {/* Hero card */}
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.97 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
                         style={{
-                          background: analysis.absoluteReturn >= 0
-                            ? "linear-gradient(135deg, rgba(0,192,135,0.06) 0%, rgba(94,92,230,0.04) 100%)"
-                            : "linear-gradient(135deg, rgba(240,97,109,0.06) 0%, rgba(94,92,230,0.04) 100%)",
-                          border: `1px solid ${analysis.absoluteReturn >= 0 ? "rgba(0,192,135,0.2)" : "rgba(240,97,109,0.2)"}`,
-                          borderRadius: 16, padding: "28px 32px", textAlign: "center", marginBottom: 16,
-                          boxShadow: `0 4px 24px ${analysis.absoluteReturn >= 0 ? "rgba(0,192,135,0.08)" : "rgba(240,97,109,0.08)"}`,
+                          background: C.surface,
+                          border: `1px solid rgba(0,0,0,0.07)`,
+                          borderLeft: `3px solid ${analysis.absoluteReturn >= 0 ? C.green : C.red}`,
+                          borderRadius: 12, padding: "24px 28px", marginBottom: 16,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                         }}
                       >
-                        <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>
-                          Your investment journey
+                        <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: 20 }}>
+                          Simulation result
                         </p>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
                           <div>
-                            <p style={{ color: C.muted, fontSize: 12, fontWeight: 500, marginBottom: 6 }}>You invested</p>
-                            <p style={{ color: C.text, fontSize: 38, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}>
+                            <p style={{ color: C.muted, fontSize: 11, fontWeight: 500, marginBottom: 4 }}>Invested</p>
+                            <p style={{ color: C.text, fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                               <AnimatedCounter value={analysis.totalInvested} />
                             </p>
                           </div>
-                          <div style={{ fontSize: 24, color: C.muted, fontWeight: 300 }}>→</div>
+                          <div style={{ color: C.muted, fontSize: 18, fontWeight: 300 }}>→</div>
                           <div>
-                            <p style={{ color: C.muted, fontSize: 12, fontWeight: 500, marginBottom: 6 }}>It became</p>
+                            <p style={{ color: C.muted, fontSize: 11, fontWeight: 500, marginBottom: 4 }}>Current value</p>
                             <p style={{
                               color: analysis.absoluteReturn >= 0 ? C.green : C.red,
-                              fontSize: 38, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1,
+                              fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1, fontVariantNumeric: "tabular-nums",
                             }}>
                               <AnimatedCounter value={analysis.currentValue} />
                             </p>
                           </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
-                          <span style={{
-                            padding: "5px 16px", borderRadius: 20,
-                            background: analysis.absoluteReturn >= 0 ? "rgba(0,192,135,0.1)" : "rgba(240,97,109,0.1)",
-                            color: analysis.absoluteReturn >= 0 ? C.green : C.red,
-                            fontSize: 14, fontWeight: 700,
-                          }}>
-                            {analysis.absoluteReturn >= 0 ? "+" : ""}{analysis.percentReturn?.toFixed(1)}% total return
-                          </span>
-                          <span style={{ color: C.muted, fontSize: 14 }}>·</span>
-                          <span style={{ color: C.textSub, fontSize: 14, fontWeight: 600 }}>
-                            {analysis.cagr}% CAGR
-                          </span>
+                          <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                            <span style={{
+                              padding: "4px 10px", borderRadius: 6,
+                              background: analysis.absoluteReturn >= 0 ? C.greenLight : C.redLight,
+                              color: analysis.absoluteReturn >= 0 ? C.green : C.red,
+                              fontSize: 13, fontWeight: 600,
+                            }}>
+                              {analysis.absoluteReturn >= 0 ? "+" : ""}{analysis.percentReturn?.toFixed(1)}% return
+                            </span>
+                            <span style={{ color: C.muted, fontSize: 12, fontWeight: 500 }}>
+                              {analysis.cagr}% CAGR
+                            </span>
+                          </div>
                         </div>
                       </motion.div>
 
@@ -1680,211 +1882,292 @@ export default function BacktestPage() {
                             { label: "Best Month", value: `+${analysis.riskMetrics.bestMonth}%`, color: C.green, tooltip: "The portfolio's single best calendar month — the biggest one-month gain in the period." },
                             { label: "Worst Month", value: `${analysis.riskMetrics.worstMonth}%`, color: C.red, tooltip: "The portfolio's single worst calendar month — the biggest one-month loss. Seeing this in your account tests investor patience." },
                           ].map(m => (
-                            <MetricCard key={m.label} label={m.label} value={m.value} color={m.color} tooltip={m.tooltip} />
+                            <MetricCard key={m.label} label={m.label} value={m.value} color={m.color} tooltip={m.tooltip} isDark={isDark} />
                           ))}
                         </div>
                       )}
 
-                      {/* Missed Best Days */}
-                      {missedDaysAnalysis && (
-                        <div style={{ ...card, marginBottom: 16 }}>
-                          <h4 style={{ color: C.text, fontSize: 14, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.02em" }}>
-                            What If You Missed the Best Days?
-                          </h4>
-                          <p style={{ color: C.muted, fontSize: 12, marginBottom: 14 }}>
-                            Missing just a few of the best market days dramatically reduces returns — the case for staying invested.
-                          </p>
-                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                              <tr>
-                                {["Scenario", "Final Value", "Return", "CAGR"].map(h => (
-                                  <th key={h} style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", padding: "6px 10px", textAlign: "left", borderBottom: `1px solid ${C.border}` }}>{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {missedDaysAnalysis.map((row, idx) => (
-                                <tr key={row.n} style={{ background: idx === 0 ? `${C.accent}05` : "transparent" }}>
-                                  <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: idx === 0 ? 700 : 400, color: C.text, borderBottom: `1px solid ${C.border}` }}>
-                                    {row.n === 0 ? "✓ Stayed fully invested" : `Missed ${row.n} best days`}
-                                  </td>
-                                  <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: C.text, borderBottom: `1px solid ${C.border}`, fontVariantNumeric: "tabular-nums" }}>
-                                    ₹{Math.round(row.finalValue).toLocaleString("en-IN")}
-                                  </td>
-                                  <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: row.returnPct >= 0 ? C.green : C.red, borderBottom: `1px solid ${C.border}` }}>
-                                    {row.returnPct >= 0 ? "+" : ""}{row.returnPct.toFixed(1)}%
-                                  </td>
-                                  <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: row.cagr >= 0 ? C.green : C.red, borderBottom: `1px solid ${C.border}` }}>
-                                    {row.cagr >= 0 ? "+" : ""}{row.cagr}%
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                      {/* Scenario Story Card */}
+                      {(() => {
+                        const matchedPreset = HISTORICAL_PRESETS.find(p =>
+                          p.date === startDate && (p.endDate === endDate || (!p.endDate && endDate === new Date().toISOString().slice(0,7)))
+                        ) || HISTORICAL_PRESETS.find(p =>
+                          selectedAssets.length > 0 && p.assets.some(a => a.symbol === selectedAssets[0]?.symbol) && p.date === startDate
+                        );
+                        if (!matchedPreset) return null;
+                        return (
+                          <motion.div
+                            key={matchedPreset.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: 0.15 }}
+                            style={{
+                              background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                              border: `1px solid ${C.border}`,
+                              borderLeft: `3px solid ${matchedPreset.color}`,
+                              borderRadius: 12,
+                              padding: "18px 22px",
+                              marginBottom: 0,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                              <span style={{ fontSize: 20 }}>{matchedPreset.icon}</span>
+                              <div>
+                                <p style={{ color: C.text, fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>{matchedPreset.label}</p>
+                                <p style={{ color: C.muted, fontSize: 10, fontWeight: 500, marginTop: 2 }}>
+                                  {matchedPreset.date}{matchedPreset.endDate ? ` → ${matchedPreset.endDate}` : ""} · Scenario Snapshot
+                                </p>
+                              </div>
+                            </div>
+                            <p style={{
+                              color: C.textSub, fontSize: 13, lineHeight: 1.75,
+                              fontWeight: 400, letterSpacing: "0.005em",
+                            }}>
+                              {matchedPreset.story}
+                            </p>
+                          </motion.div>
+                        );
+                      })()}
 
+                    </div>
+                  )}
+
+                  {/* ── PLANNER TAB ── */}
+                  {activeTab === "planner" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                       {/* Tax Impact */}
                       {taxAnalysis && (
-                        <div style={{ ...card, marginBottom: 16 }}>
-                          <h4 style={{ color: C.text, fontSize: 14, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.02em" }}>
-                            Tax Impact ({taxAnalysis.taxType})
+                        <div style={{ ...getCardStyle(C), marginBottom: 0 }}>
+                          <h4 style={{ color: C.text, fontSize: 13, fontWeight: 600, marginBottom: 4, letterSpacing: "-0.01em" }}>
+                            Tax impact — {taxAnalysis.taxType}
                           </h4>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginTop: 12 }}>
                             {[
-                              { label: "Gross Gain", value: formatCurrency(taxAnalysis.grossGain), color: C.green },
-                              { label: "Tax Amount", value: formatCurrency(taxAnalysis.taxAmount), color: C.red },
-                              { label: "Net Gain", value: formatCurrency(taxAnalysis.netGain), color: taxAnalysis.netGain >= 0 ? C.green : C.red },
-                              { label: "Net Return", value: `${taxAnalysis.netReturnPct >= 0 ? "+" : ""}${taxAnalysis.netReturnPct}%`, color: taxAnalysis.netReturnPct >= 0 ? C.green : C.red },
+                              { label: "Gross Gain", value: formatCurrency(taxAnalysis.grossGain), color: C.green, bg: C.greenLight },
+                              { label: "Tax", value: formatCurrency(taxAnalysis.taxAmount), color: C.red, bg: C.redLight },
+                              { label: "Net Gain", value: formatCurrency(taxAnalysis.netGain), color: taxAnalysis.netGain >= 0 ? C.green : C.red, bg: taxAnalysis.netGain >= 0 ? C.greenLight : C.redLight },
+                              { label: "Net Return", value: `${taxAnalysis.netReturnPct >= 0 ? "+" : ""}${taxAnalysis.netReturnPct}%`, color: taxAnalysis.netReturnPct >= 0 ? C.green : C.red, bg: taxAnalysis.netReturnPct >= 0 ? C.greenLight : C.redLight },
                             ].map(item => (
-                              <div key={item.label} style={{ textAlign: "center", padding: "10px", background: "rgba(0,0,0,0.02)", borderRadius: 10, border: `1px solid ${C.border}` }}>
-                                <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{item.label}</p>
-                                <p style={{ color: item.color, fontSize: 16, fontWeight: 800 }}>{item.value}</p>
+                              <div key={item.label} style={{ textAlign: "center", padding: "10px", background: item.bg, borderRadius: 9, border: `1px solid rgba(0,0,0,0.06)` }}>
+                                <p style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>{item.label}</p>
+                                <p style={{ color: item.color, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{item.value}</p>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
+                      
+                      <MonteCarloProjections analysis={analysis} years={10} />
                     </div>
                   )}
 
-                  {/* ── PROJECTIONS TAB ── */}
-                  {activeTab === "projections" && (
-                    <MonteCarloProjections analysis={analysis} years={10} />
-                  )}
-
-                  {/* ── STRATEGIES TAB ── */}
-                  {activeTab === "strategies" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {ALL_STRATEGIES.map(strategy => {
-                        const result = strategyResults.find(
-                          r => r.strategyId === strategy.id || r.strategy === strategy.name
-                        );
-                        const isExpanded = expandedStrategy === strategy.id;
-                        const sig = result?.signal ?? "HOLD";
-                        const sigColor = sig === "BUY" ? C.green : sig === "SELL" ? C.red : C.muted;
-                        const sigBg = sig === "BUY" ? `${C.green}18` : sig === "SELL" ? `${C.red}18` : "rgba(0,0,0,0.05)";
-
-                        return (
-                          <div
-                            key={strategy.id}
-                            style={{
-                              background: C.surface,
-                              border: isExpanded ? `1px solid ${C.accent}40` : `1px solid ${C.border}`,
-                              borderRadius: 14,
-                              boxShadow: isExpanded ? `0 4px 20px ${C.accent}18` : "0 1px 3px rgba(0,0,0,0.04)",
-                              overflow: "hidden",
-                              transition: "border 0.18s, box-shadow 0.18s",
-                            }}
-                          >
-                            <button
-                              onClick={() => setExpandedStrategy(isExpanded ? null : strategy.id)}
-                              style={{
-                                width: "100%", display: "flex", alignItems: "center",
-                                gap: 10, padding: "13px 14px",
-                                background: "transparent", border: "none",
-                                cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                              }}
-                            >
-                              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{strategy.icon}</span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>{strategy.name}</div>
-                                <div style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>{strategy.description}</div>
+                  {/* ── LEARN TAB ── */}
+                  {activeTab === "learn" && (() => {
+                    const buys = strategyResults.filter(r => r.signal === "BUY").length;
+                    const sells = strategyResults.filter(r => r.signal === "SELL").length;
+                    const holds = strategyResults.filter(r => r.signal === "HOLD").length;
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {/* Missed Best Days */}
+                        {missedDaysAnalysis && (
+                          <div style={{ ...getCardStyle(C), marginBottom: 16 }}>
+                            <h4 style={{ color: C.text, fontSize: 13, fontWeight: 600, marginBottom: 4, letterSpacing: "-0.01em" }}>
+                              What if you missed the best days?
+                            </h4>
+                            <p style={{ color: C.muted, fontSize: 12, marginBottom: 14, lineHeight: 1.55 }}>
+                              Missing just a few top trading days dramatically reduces returns. The case for staying invested.
+                            </p>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <thead>
+                                <tr>
+                                  {["Scenario", "Final Value", "Return", "CAGR"].map(h => (
+                                    <th key={h} style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", padding: "6px 10px", textAlign: "left", borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {missedDaysAnalysis.map((row, idx) => (
+                                  <tr key={row.n} style={{ background: idx === 0 ? `${C.accent}05` : "transparent" }}>
+                                    <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: idx === 0 ? 700 : 400, color: C.text, borderBottom: `1px solid ${C.border}` }}>
+                                      {row.n === 0 ? "✓ Stayed fully invested" : `Missed ${row.n} best days`}
+                                    </td>
+                                    <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: C.text, borderBottom: `1px solid ${C.border}`, fontVariantNumeric: "tabular-nums" }}>
+                                      ₹{Math.round(row.finalValue).toLocaleString("en-IN")}
+                                    </td>
+                                    <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: row.returnPct >= 0 ? C.green : C.red, borderBottom: `1px solid ${C.border}` }}>
+                                      {row.returnPct >= 0 ? "+" : ""}{row.returnPct.toFixed(1)}%
+                                    </td>
+                                    <td style={{ padding: "9px 10px", fontSize: 12, fontWeight: 700, color: row.cagr >= 0 ? C.green : C.red, borderBottom: `1px solid ${C.border}` }}>
+                                      {row.cagr >= 0 ? "+" : ""}{row.cagr}%
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        
+                        {/* Signal summary */}
+                        {strategyResults.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 4 }}>
+                            {[
+                              { label: "Buy", count: buys, color: C.green, bg: C.greenLight },
+                              { label: "Hold", count: holds, color: C.muted, bg: "rgba(0,0,0,0.04)" },
+                              { label: "Sell", count: sells, color: C.red, bg: C.redLight },
+                            ].map(s => (
+                              <div key={s.label} style={{
+                                background: s.bg, borderRadius: 10,
+                                padding: "10px 12px", textAlign: "center",
+                                border: `1px solid ${s.color}20`,
+                              }}>
+                                <div style={{ fontSize: 22, fontWeight: 700, color: s.color, letterSpacing: "-0.03em" }}>{s.count}</div>
+                                <div style={{ fontSize: 10, fontWeight: 600, color: s.color, textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 2 }}>{s.label}</div>
                               </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                {result ? (
-                                  <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 6, background: sigBg, color: sigColor }}>
-                                    {sig}
-                                  </span>
-                                ) : (
-                                  <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 6, background: "rgba(0,0,0,0.05)", color: C.muted }}>—</span>
-                                )}
-                                <span style={{
-                                  fontSize: 12, color: isExpanded ? C.accent : C.muted,
-                                  transition: "transform 0.2s, color 0.2s", display: "inline-block",
-                                  transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                                }}>▾</span>
-                              </div>
-                            </button>
+                            ))}
+                          </div>
+                        )}
 
-                            <AnimatePresence>
-                              {isExpanded && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                  transition={{ duration: 0.22, ease: "easeOut" }}
-                                  style={{ overflow: "hidden" }}
+                        {/* Strategy rows */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
+                          {ALL_STRATEGIES.map(strategy => {
+                            const result = strategyResults.find(
+                              r => r.strategyId === strategy.id || r.strategy === strategy.name
+                            );
+                            const isExpanded = expandedStrategy === strategy.id;
+                            const sig = result?.signal ?? "HOLD";
+                            const sigColor = sig === "BUY" ? C.green : sig === "SELL" ? C.red : C.muted;
+                            const sigBg = sig === "BUY" ? C.greenLight : sig === "SELL" ? C.redLight : "rgba(0,0,0,0.05)";
+
+                            return (
+                              <div
+                                key={strategy.id}
+                                style={{
+                                  background: C.surface,
+                                  border: isExpanded ? `1px solid ${C.accent}30` : `1px solid rgba(0,0,0,0.07)`,
+                                  borderLeft: `3px solid ${result ? sigColor : "rgba(0,0,0,0.1)"}`,
+                                  borderRadius: 10,
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                                  overflow: "hidden",
+                                  transition: "border 0.15s",
+                                }}
+                              >
+                                <button
+                                  onClick={() => setExpandedStrategy(isExpanded ? null : strategy.id)}
+                                  style={{
+                                    width: "100%", display: "flex", alignItems: "center",
+                                    gap: 10, padding: "11px 14px",
+                                    background: "transparent", border: "none",
+                                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                  }}
                                 >
-                                  <div style={{ padding: "0 14px 14px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-                                    <p style={{ color: C.textSub, fontSize: 12, lineHeight: 1.6, padding: "10px 0 8px" }}>
-                                      {STRATEGY_DESCRIPTIONS[strategy.id] ?? strategy.description}
-                                    </p>
-
-                                    {result ? (
-                                      <>
-                                        <div style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, padding: "10px 8px 4px", marginBottom: 12 }}>
-                                          <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, marginBottom: 6, paddingLeft: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                            {STRATEGY_CHART_LABEL[strategy.id] ?? "Indicator"}
-                                          </p>
-                                          <StrategyMiniChart data={result.graph ?? []} signal={sig} strategyId={strategy.id} />
-                                        </div>
-
-                                        <div style={{ marginBottom: 12 }}>
-                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                                            <span style={{ color: C.textSub, fontSize: 11, fontWeight: 600 }}>Confidence</span>
-                                            <span style={{ color: sigColor, fontSize: 13, fontWeight: 700 }}>{result.probability}%</span>
-                                          </div>
-                                          <div style={{ height: 5, background: "rgba(0,0,0,0.07)", borderRadius: 3, overflow: "hidden" }}>
-                                            <div style={{ width: `${result.probability}%`, height: "100%", borderRadius: 3, background: sigColor, transition: "width 0.6s ease" }} />
-                                          </div>
-                                        </div>
-
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-                                          {[
-                                            { label: "Win Rate", value: result.winRate != null ? `${result.winRate}%` : "—", color: (result.winRate ?? 0) >= 50 ? C.green : C.red },
-                                            { label: "Avg Return", value: result.avgReturn != null ? `${result.avgReturn > 0 ? "+" : ""}${result.avgReturn}%` : "—", color: (result.avgReturn ?? 0) >= 0 ? C.green : C.red },
-                                            { label: "Assets", value: result.assetCount != null ? `${result.assetCount}` : "1", color: C.accent },
-                                          ].map(s => (
-                                            <div key={s.label} style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 8, padding: "7px 10px", textAlign: "center" }}>
-                                              <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>{s.label}</div>
-                                              <div style={{ color: s.color, fontSize: 14, fontWeight: 700 }}>{s.value}</div>
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                                          <div style={{ background: `${C.green}08`, border: `1px solid ${C.green}20`, borderRadius: 8, padding: "8px 12px" }}>
-                                            <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Entry Price</div>
-                                            <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>₹{result.entryPrice.toLocaleString("en-IN")}</div>
-                                          </div>
-                                          <div style={{ background: sig === "SELL" ? `${C.red}08` : `${C.accent}08`, border: `1px solid ${sig === "SELL" ? C.red + "20" : C.accent + "20"}`, borderRadius: 8, padding: "8px 12px" }}>
-                                            <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Target Price</div>
-                                            <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>₹{result.exitPrice.toLocaleString("en-IN")}</div>
-                                          </div>
-                                        </div>
-
-                                        <p style={{ color: C.textSub, fontSize: 11, lineHeight: 1.65, background: "rgba(0,0,0,0.02)", borderRadius: 8, padding: "8px 10px", borderLeft: `3px solid ${sigColor}` }}>
-                                          {result.reasoning}
-                                        </p>
-                                      </>
-                                    ) : (
-                                      <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>
-                                        Strategy data not available for this portfolio
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{strategy.name}</div>
+                                    <div style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>{strategy.description}</div>
+                                    {result && (
+                                      <div style={{ marginTop: 6, height: 3, background: "rgba(0,0,0,0.07)", borderRadius: 2, overflow: "hidden", width: "70%" }}>
+                                        <div style={{ width: `${result.probability}%`, height: "100%", borderRadius: 2, background: sigColor }} />
                                       </div>
                                     )}
                                   </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                                    {result ? (
+                                      <span style={{
+                                        fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
+                                        background: sigBg, color: sigColor, letterSpacing: "0.03em",
+                                      }}>
+                                        {sig}
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 20, background: "rgba(0,0,0,0.05)", color: C.muted }}>—</span>
+                                    )}
+                                    <ChevronDown
+                                      size={14}
+                                      color={isExpanded ? C.accent : C.muted}
+                                      style={{ transition: "transform 0.15s", transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", flexShrink: 0 }}
+                                    />
+                                  </div>
+                                </button>
 
-                  {/* ── HOLDINGS TAB ── */}
-                  {activeTab === "holdings" && (
+                                <AnimatePresence>
+                                  {isExpanded && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      transition={{ duration: 0.22, ease: "easeOut" }}
+                                      style={{ overflow: "hidden" }}
+                                    >
+                                      <div style={{ padding: "0 14px 14px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+                                        <p style={{ color: C.textSub, fontSize: 12, lineHeight: 1.6, padding: "10px 0 8px" }}>
+                                          {STRATEGY_DESCRIPTIONS[strategy.id] ?? strategy.description}
+                                        </p>
+
+                                        {result ? (
+                                          <>
+                                            <div style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, padding: "10px 8px 4px", marginBottom: 12 }}>
+                                              <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, marginBottom: 6, paddingLeft: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                                {STRATEGY_CHART_LABEL[strategy.id] ?? "Indicator"}
+                                              </p>
+                                              <StrategyMiniChart data={result.graph ?? []} signal={sig} strategyId={strategy.id} />
+                                            </div>
+
+                                            <div style={{ marginBottom: 12 }}>
+                                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                                                <span style={{ color: C.textSub, fontSize: 11, fontWeight: 600 }}>Confidence</span>
+                                                <span style={{ color: sigColor, fontSize: 13, fontWeight: 700 }}>{result.probability}%</span>
+                                              </div>
+                                              <div style={{ height: 5, background: "rgba(0,0,0,0.07)", borderRadius: 3, overflow: "hidden" }}>
+                                                <div style={{ width: `${result.probability}%`, height: "100%", borderRadius: 3, background: sigColor, transition: "width 0.6s ease" }} />
+                                              </div>
+                                            </div>
+
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+                                              {[
+                                                { label: "Win Rate", value: result.winRate != null ? `${result.winRate}%` : "—", color: (result.winRate ?? 0) >= 50 ? C.green : C.red },
+                                                { label: "Avg Return", value: result.avgReturn != null ? `${result.avgReturn > 0 ? "+" : ""}${result.avgReturn}%` : "—", color: (result.avgReturn ?? 0) >= 0 ? C.green : C.red },
+                                                { label: "Assets", value: result.assetCount != null ? `${result.assetCount}` : "1", color: C.accent },
+                                              ].map(s => (
+                                                <div key={s.label} style={{ background: "rgba(0,0,0,0.02)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 8, padding: "7px 10px", textAlign: "center" }}>
+                                                  <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>{s.label}</div>
+                                                  <div style={{ color: s.color, fontSize: 14, fontWeight: 700 }}>{s.value}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                                              <div style={{ background: `${C.green}08`, border: `1px solid ${C.green}20`, borderRadius: 8, padding: "8px 12px" }}>
+                                                <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Entry Price</div>
+                                                <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>₹{result.entryPrice.toLocaleString("en-IN")}</div>
+                                              </div>
+                                              <div style={{ background: sig === "SELL" ? `${C.red}08` : `${C.accent}08`, border: `1px solid ${sig === "SELL" ? C.red + "20" : C.accent + "20"}`, borderRadius: 8, padding: "8px 12px" }}>
+                                                <div style={{ color: C.muted, fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Target Price</div>
+                                                <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>₹{result.exitPrice.toLocaleString("en-IN")}</div>
+                                              </div>
+                                            </div>
+
+                                            <p style={{ color: C.textSub, fontSize: 11, lineHeight: 1.65, background: "rgba(0,0,0,0.02)", borderRadius: 8, padding: "8px 10px", borderLeft: `3px solid ${sigColor}` }}>
+                                              {result.reasoning}
+                                            </p>
+                                          </>
+                                        ) : (
+                                          <div style={{ textAlign: "center", color: C.muted, fontSize: 12, padding: "12px 0" }}>
+                                            Run simulation first to see strategy signals
+                                          </div>
+                                        )}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── OVERVIEW TAB (Holdings portion) ── */}
+                  {activeTab === "overview" && (
                     <div>
                       {/* Asset toggle tabs */}
                       <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
@@ -1901,8 +2184,8 @@ export default function BacktestPage() {
                               style={{
                                 display: "flex", alignItems: "center", gap: 6,
                                 padding: "5px 10px 5px 6px",
-                                background: isActive ? `${C.accent}0D` : C.surface,
-                                border: isActive ? `1px solid ${C.accent}40` : `1px solid ${C.border}`,
+                                background: isActive ? C.accentLight : C.surface,
+                                border: isActive ? `1px solid ${C.accent}40` : `1px solid rgba(0,0,0,0.09)`,
                                 borderRadius: 20, cursor: "pointer",
                                 color: isActive ? C.accent : C.textSub,
                                 fontSize: 12, fontWeight: 700, fontFamily: "inherit", transition: "all 0.15s",
@@ -1990,12 +2273,12 @@ export default function BacktestPage() {
                   {activeTab === "risk" && (
                     <div>
                       {analysis.drawdownSeries && analysis.drawdownSeries.length > 5 && (
-                        <div style={{ ...card, marginBottom: 16 }}>
+                        <div style={{ ...getCardStyle(C), marginBottom: 16 }}>
                           <DrawdownChart data={analysis.drawdownSeries} />
                         </div>
                       )}
                       {analysis.correlationMatrix && analysis.correlationSymbols && (
-                        <div style={{ ...card }}>
+                        <div style={{ ...getCardStyle(C) }}>
                           <CorrelationHeatmap
                             matrix={analysis.correlationMatrix}
                             symbols={analysis.correlationSymbols}
@@ -2010,33 +2293,74 @@ export default function BacktestPage() {
                     </div>
                   )}
 
-                  {/* ── INSIGHTS TAB ── */}
-                  {activeTab === "insights" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {/* ── LEARN TAB (Insights portion) ── */}
+                  {activeTab === "learn" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      
+                      <div style={{ 
+                        ...getCardStyle(C),
+                        background: isDark ? "linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(26, 29, 39, 0) 100%)" : "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(255, 255, 255, 0) 100%)",
+                        border: `1px solid ${C.accent}30`
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                          <div style={{ padding: 6, background: C.accent, borderRadius: 8, color: "#fff" }}>
+                            <Sparkles size={16} />
+                          </div>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>AI Context & Analysis</h3>
+                        </div>
+                        <p style={{ color: C.textSub, fontSize: 13, lineHeight: 1.5, margin: 0, marginTop: 4 }}>
+                          Historical context and automated technical observations generated for your selected simulation frame.
+                        </p>
+                      </div>
+
                       {insights.length === 0 ? (
-                        <div style={{ padding: 32, textAlign: "center", color: C.muted, fontSize: 13 }}>
-                          No insights available
+                        <div style={{ padding: 48, textAlign: "center", color: C.muted, fontSize: 13, border: `1px dashed ${C.border}`, borderRadius: 16 }}>
+                          <Lightbulb style={{ width: 24, height: 24, opacity: 0.5, margin: "0 auto 12px" }} />
+                          No insights generated. Try running a diverse or volatile scenario to see AI analysis.
                         </div>
                       ) : (
-                        insights.map((item, i) => (
-                          <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -12 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.07 }}
-                            style={{
-                              display: "flex", alignItems: "flex-start", gap: 14,
-                              padding: "14px 16px", borderRadius: 12,
-                              background: C.surface, border: `1px solid ${C.border}`,
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                            }}
-                          >
-                            <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                            <p style={{ color: C.text, fontSize: 13, lineHeight: 1.65, fontWeight: 400 }}>
-                              {item.text}
-                            </p>
-                          </motion.div>
-                        ))
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+                          {insights.map((item, i) => {
+                            const isWarning = item.color === "#F59E0B" || item.color === "#EF4444" || item.color === "#FF3B30";
+                            const Icon = isWarning ? AlertTriangle : Lightbulb;
+                            
+                            return (
+                              <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                style={{
+                                  display: "flex", flexDirection: "column", gap: 10,
+                                  padding: "16px 20px", borderRadius: 12,
+                                  background: C.surface, 
+                                  border: `1px solid ${C.border}`,
+                                  borderTop: `3px solid ${item.color}`,
+                                  position: "relative",
+                                  overflow: "hidden"
+                                }}
+                              >
+                                <div style={{ 
+                                  position: "absolute", top: -16, right: -16, opacity: 0.05, 
+                                  color: item.color, transform: "scale(2.5)" 
+                                }}>
+                                  <Icon size={48} />
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: `${item.color}20`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Icon size={12} color={item.color} />
+                                  </div>
+                                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: item.color }}>
+                                    {isWarning ? "Risk Notice" : "Observation"}
+                                  </span>
+                                </div>
+                                <p style={{ color: C.text, fontSize: 13, lineHeight: 1.6, fontWeight: 400, margin: 0, zIndex: 1 }}>
+                                  {item.text}
+                                </p>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   )}
@@ -2046,7 +2370,7 @@ export default function BacktestPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                       {/* DCA vs Lump Sum */}
                       {analysis.lumpSumComparison ? (
-                        <div style={card}>
+                        <div style={getCardStyle(C)}>
                           <h4 style={{ color: C.text, fontSize: 15, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.02em" }}>
                             DCA vs Lump Sum
                           </h4>
@@ -2059,15 +2383,17 @@ export default function BacktestPage() {
                               { label: "Lump Sum (Day 1)", value: analysis.lumpSumComparison.currentValue, cagr: analysis.lumpSumComparison.cagr, ret: analysis.lumpSumComparison.percentReturn, highlight: false },
                             ].map(s => (
                               <div key={s.label} style={{
-                                padding: "20px", borderRadius: 14,
-                                background: s.highlight ? `${C.accent}08` : "rgba(0,0,0,0.02)",
-                                border: `1px solid ${s.highlight ? C.accent + "30" : C.border}`,
+                                padding: "18px 20px", borderRadius: 12,
+                                background: s.highlight ? C.accentLight : "rgba(0,0,0,0.02)",
+                                border: `1px solid ${s.highlight ? C.accent + "30" : "rgba(0,0,0,0.07)"}`,
+                                borderLeft: `3px solid ${s.highlight ? C.accent : "rgba(0,0,0,0.1)"}`,
                               }}>
-                                <p style={{ color: s.highlight ? C.accent : C.muted, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>{s.label}</p>
-                                <p style={{ color: C.text, fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 6 }}>{formatCurrency(s.value)}</p>
-                                <div style={{ display: "flex", gap: 12 }}>
-                                  <span style={{ color: s.ret >= 0 ? C.green : C.red, fontSize: 14, fontWeight: 700 }}>{s.ret >= 0 ? "+" : ""}{s.ret.toFixed(1)}%</span>
-                                  <span style={{ color: C.muted, fontSize: 13 }}>{s.cagr}% CAGR</span>
+                                <p style={{ color: s.highlight ? C.accent : C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>{s.label}</p>
+                                <p style={{ color: C.text, fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 8, fontVariantNumeric: "tabular-nums" }}>{formatCurrency(s.value)}</p>
+                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                  <span style={{ color: s.ret >= 0 ? C.green : C.red, fontSize: 12, fontWeight: 600 }}>{s.ret >= 0 ? "+" : ""}{s.ret.toFixed(1)}%</span>
+                                  <span style={{ color: C.muted, fontSize: 11 }}>·</span>
+                                  <span style={{ color: C.muted, fontSize: 11 }}>{s.cagr}% CAGR</span>
                                 </div>
                               </div>
                             ))}
@@ -2075,8 +2401,8 @@ export default function BacktestPage() {
                           {(() => {
                             const diff = analysis.currentValue - analysis.lumpSumComparison.currentValue;
                             return (
-                              <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: diff >= 0 ? `${C.green}08` : `${C.red}08`, border: `1px solid ${diff >= 0 ? C.green : C.red}25` }}>
-                                <p style={{ color: diff >= 0 ? C.green : C.red, fontSize: 13, fontWeight: 700 }}>
+                              <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 9, background: diff >= 0 ? C.greenLight : C.redLight, border: `1px solid ${diff >= 0 ? C.green : C.red}25`, borderLeft: `3px solid ${diff >= 0 ? C.green : C.red}` }}>
+                                <p style={{ color: diff >= 0 ? C.green : C.red, fontSize: 13, fontWeight: 600 }}>
                                   DCA {diff >= 0 ? "outperformed" : "underperformed"} lump sum by {formatCurrency(Math.abs(diff))}
                                 </p>
                               </div>
@@ -2084,14 +2410,87 @@ export default function BacktestPage() {
                           })()}
                         </div>
                       ) : (
-                        <div style={{ padding: 32, textAlign: "center", color: C.muted, fontSize: 13, ...card }}>
+                        <div style={{ padding: 32, textAlign: "center", color: C.muted, fontSize: 13, ...getCardStyle(C) }}>
                           <Info style={{ width: 20, height: 20, color: C.muted, display: "block", margin: "0 auto 10px" }} />
                           Lump sum comparison data not available. Enable recurring investments and re-run to compare DCA vs lump sum.
                         </div>
                       )}
 
-                      {/* Goal-Based SIP Calculator */}
-                      <SIPCalculator formatCurrency={formatCurrency} />
+                      {/* Portfolio vs Benchmarks */}
+                      {analysis.benchmarks && Object.keys(analysis.benchmarks).length > 0 && (
+                        <div style={getCardStyle(C)}>
+                          <h4 style={{ color: C.text, fontSize: 15, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.02em" }}>
+                            Portfolio vs Benchmarks
+                          </h4>
+                          <p style={{ color: C.muted, fontSize: 12, marginBottom: 16 }}>
+                            How your portfolio compares if the same amount was invested in standard indices.
+                          </p>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                            {/* The portfolio itself */}
+                            <div style={{
+                              padding: "16px", borderRadius: 12,
+                              background: C.accentLight,
+                              border: `1px solid ${C.accent}30`,
+                              borderLeft: `3px solid ${C.accent}`,
+                            }}>
+                              <p style={{ color: C.accent, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Your Portfolio</p>
+                              <p style={{ color: C.text, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 4 }}>{formatCurrency(analysis.currentValue)}</p>
+                              <span style={{ color: analysis.percentReturn >= 0 ? C.green : C.red, fontSize: 12, fontWeight: 600 }}>{analysis.percentReturn >= 0 ? "+" : ""}{analysis.percentReturn.toFixed(1)}%</span>
+                              <div style={{ height: 60, marginTop: 10 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={analysis.chartData}>
+                                    <defs>
+                                      <linearGradient id="colorPort" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={C.accent} stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor={C.accent} stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <Area type="monotone" dataKey="value" stroke={C.accent} fillOpacity={1} fill="url(#colorPort)" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                            
+                            {/* Benchmarks */}
+                            {Object.entries(analysis.benchmarks).map(([key, data]) => {
+                              const histData = data as Array<{ date: string; value: number; invested: number }>;
+                              const lastPt = histData[histData.length - 1];
+                              if (!lastPt) return null;
+                              const invested = lastPt.invested;
+                              const val = lastPt.value;
+                              const ret = invested > 0 ? ((val - invested) / invested) * 100 : 0;
+                              const names: Record<string, string> = { nifty: "Nifty 50", gold: "Gold", fd: "Fixed Deposit" };
+                              
+                              return (
+                                <div key={key} style={{
+                                  padding: "16px", borderRadius: 12,
+                                  background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+                                  border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
+                                  borderLeft: `3px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
+                                }}>
+                                  <p style={{ color: C.muted, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{names[key] || key}</p>
+                                  <p style={{ color: C.text, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 4 }}>{formatCurrency(val)}</p>
+                                  <span style={{ color: ret >= 0 ? C.green : C.red, fontSize: 12, fontWeight: 600 }}>{ret >= 0 ? "+" : ""}{ret.toFixed(1)}%</span>
+                                  <div style={{ height: 60, marginTop: 10 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <AreaChart data={histData}>
+                                        <defs>
+                                          <linearGradient id={`color${key}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={C.muted} stopOpacity={0.2}/>
+                                            <stop offset="95%" stopColor={C.muted} stopOpacity={0}/>
+                                          </linearGradient>
+                                        </defs>
+                                        <Area type="monotone" dataKey="value" stroke={C.muted} fillOpacity={1} fill={`url(#color${key})`} />
+                                      </AreaChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                     </div>
                   )}
                 </div>
@@ -2100,26 +2499,28 @@ export default function BacktestPage() {
           )}
         </div>
 
-        {/* Footer */}
-        <footer style={{
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-          padding: "16px 28px", marginTop: 24, textAlign: "center",
-          background: "rgba(255,255,255,0.4)",
-        }}>
-          <p style={{ color: C.muted, fontSize: 11, fontWeight: 500 }}>
-            WhatIfIInvested — Educational purpose only. Not financial advice.
-          </p>
-        </footer>
       </main>
+
+      {/* ── FLOATING AI CHAT (bottom center) ── */}
+      <ChatInterface
+        isChatOpen={isChatOpen}
+        setIsChatOpen={setIsChatOpen}
+        isDark={isDark}
+        C={C}
+        analysis={analysis}
+        selectedAssets={selectedAssets}
+        strategyResults={strategyResults}
+      />
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes chatPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         * { box-sizing: border-box; }
-        button:hover { opacity: 0.88; }
-        button:active { transform: scale(0.98); }
+        button { transition: opacity 0.12s ease, background 0.12s ease; }
+        button:not(:disabled):active { opacity: 0.75; transform: scale(0.98); }
         ::-webkit-scrollbar { display: none; }
       `}</style>
     </div>

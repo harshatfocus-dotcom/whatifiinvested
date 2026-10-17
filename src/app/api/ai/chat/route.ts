@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "";
 
-const SYSTEM_PROMPT = `You are a knowledgeable financial advisor for an investment backtesting platform called "WhatIfIInvested". 
+const SYSTEM_PROMPT = `You are a knowledgeable financial advisor for an investment backtesting platform called "What if I Invested?". 
 
 You help users understand:
 1. Their portfolio performance and what it means
@@ -14,11 +14,12 @@ You help users understand:
 5. Any questions about their simulated investments
 
 Important guidelines:
+- VERY IMPORTANT: Limit your response to 2-3 short sentences. Be extremely concise.
 - Always clarify that this is for educational purposes only
 - Never give specific buy/sell recommendations
-- Explain financial concepts in simple terms
-- Be encouraging but realistic about past performance not guaranteeing future results
-- If asked about specific investments, explain the methodology used in the simulation
+- Explain financial concepts plainly and directly
+- If asked about specific investments, be brief.
+- NEVER output your reasoning blocks like <think> tags. Only output the final user-facing response.
 
 Keep responses concise, helpful, and focused on the user's portfolio questions.`;
 
@@ -66,69 +67,7 @@ Strategy Signals: ${strategies?.map((s) => `${s.strategy}: ${s.signal}`).join(",
 
     const userMessage = `${question}\n\n${portfolioContext}`;
 
-    // Try Gemini first
-    if (GEMINI_API_KEY) {
-      try {
-        const geminiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `System: ${SYSTEM_PROMPT}\n\nUser: ${userMessage}` }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
-            }),
-          }
-        );
-
-        if (geminiResponse.ok) {
-          const data = await geminiResponse.json();
-          const response = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (response) {
-            return NextResponse.json({ response });
-          }
-        }
-      } catch (geminiError) {
-        console.error("Gemini API error:", geminiError);
-      }
-    }
-
-    // Fallback to OpenRouter
-    if (OPENROUTER_API_KEY) {
-      try {
-        const openRouterResponse = await fetch(
-          "https://openrouter.ai/api/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "qwen/qwen3.6-plus:free",
-              messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: userMessage },
-              ],
-              temperature: 0.7,
-              max_tokens: 500,
-            }),
-          }
-        );
-
-        if (openRouterResponse.ok) {
-          const data = await openRouterResponse.json();
-          const response = data.choices?.[0]?.message?.content;
-          if (response) {
-            return NextResponse.json({ response });
-          }
-        }
-      } catch (openRouterError) {
-        console.error("OpenRouter API error:", openRouterError);
-      }
-    }
-
-    // Try Sarvam AI
+    // Try Sarvam AI if key is provided (highest priority per user)
     if (SARVAM_API_KEY && SARVAM_API_KEY !== "your_sarvam_api_key") {
       try {
         const sarvamResponse = await fetch(
@@ -153,13 +92,37 @@ Strategy Signals: ${strategies?.map((s) => `${s.strategy}: ${s.signal}`).join(",
 
         if (sarvamResponse.ok) {
           const data = await sarvamResponse.json();
-          const response = data.choices?.[0]?.message?.content;
+          let response = data.choices?.[0]?.message?.content;
           if (response) {
+            // Strip out <think> blocks (reasoning) from models like DeepSeek/Sarvam
+            response = response.replace(/<think>[\s\S]*?(<\/think>|$)\n*/g, "").trim();
+            // In case the model outputted ONLY the think block and got cut off, fallback
+            if (!response) response = "I analyzed your portfolio, but the response was too short. Can you rephrase your question?";
             return NextResponse.json({ response });
           }
         }
       } catch (sarvamError) {
         console.error("Sarvam AI API error:", sarvamError);
+      }
+    }
+
+    // Try official Gemini SDK if key is provided
+    if (GEMINI_API_KEY) {
+      try {
+        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", systemInstruction: SYSTEM_PROMPT });
+
+        const result = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: userMessage }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+        });
+
+        const responseText = result.response.text();
+        if (responseText) {
+          return NextResponse.json({ response: responseText });
+        }
+      } catch (geminiError) {
+        console.error("Gemini SDK API error:", geminiError);
       }
     }
 

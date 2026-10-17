@@ -25,12 +25,13 @@ interface AssetInput {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { assets, initialInvestment, recurringAmount, startDate } = body as {
+    const { assets, initialInvestment, recurringAmount, startDate, endDate } = body as {
       assets: AssetInput[];
       initialInvestment: number;
       recurringAmount: number;
       frequency: string | null;
       startDate: string;
+      endDate?: string;
       benchmarks?: string[];
     };
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     const start = new Date(startDate);
-    const end = new Date();
+    const end = endDate ? new Date(endDate) : new Date();
     const years = Math.max(0.1, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365));
     const months = Math.floor(years * 12);
     const totalRecurring = (recurringAmount || 0) * months;
